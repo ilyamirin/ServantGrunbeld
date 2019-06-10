@@ -59,6 +59,7 @@ class AzureSynthesizer:
 			self.voices = response.json()
 			self.voices = [k for k in response.json() if k["Locale"] == self.language]
 			self.voices = ["-".join(value["ShortName"].split("-")[2:]) for value in self.voices]
+
 		else:
 			print("\nStatus code: " + str(
 				response.status_code) + "\nSomething went wrong. Check your subscription key and headers.\n")
@@ -108,6 +109,7 @@ class AzureSynthesizer:
 		if response.status_code == 200:
 			result = response.content
 			if play:
+				# TODO предусмотреть случай пустой аудиодорожки
 				self.player.playAudio(result)
 			if toFile:
 				self.audioToFile(result, wpath, fileName)
