@@ -1,20 +1,20 @@
-import os, sys
+import os
 import requests
 import time
 
 from xml.etree import ElementTree
 
-currpath = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(currpath, ".."))
-
 from AudioPlayer import Player
-import SpeechSynthesis.Config as CFG
 
-sys.path.pop()
+try:
+	from .Config import AzureCredentials, AzureConfig
+except ImportError:
+	from Config import AzureCredentials, AzureConfig
 
 
 class AzureSynthesizer:
-	def __init__(self, key=CFG.SUBSCRIPTION_KEY, region=CFG.SERVICE_REGION, language=CFG.RUS):
+	def __init__(self, key=AzureCredentials.SUBSCRIPTION_KEY, region=AzureCredentials.SERVICE_REGION,
+	             language=AzureConfig.LANG_RUS):
 		self.key = key
 		self.region = region
 
@@ -25,18 +25,18 @@ class AzureSynthesizer:
 		self.voices = {}
 
 		self.REST = {
-			"base": CFG.REST_BASE_URL,
-			"path": CFG.REST_PATH,
-			"voices": CFG.VOICES_PATH
+			"base": AzureConfig.REST_BASE_URL,
+			"path": AzureConfig.REST_PATH,
+			"voices": AzureConfig.VOICES_PATH
 		}
 
 		self.player = Player()
 
-		self.__getToken()
-		self.__getVoices()
+		self._getToken()
+		self._getVoices()
 
 
-	def __getToken(self):
+	def _getToken(self):
 		fetch_token_url = "https://{}.api.cognitive.microsoft.com/sts/v1.0/issueToken".format(self.region)
 
 		headers = {
@@ -47,7 +47,7 @@ class AzureSynthesizer:
 		self.token = str(response.text)
 
 
-	def __getVoices(self):
+	def _getVoices(self):
 		fullUrl = "{}/{}".format(self.REST["base"], self.REST["voices"])
 
 		headers = {

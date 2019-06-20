@@ -10,8 +10,8 @@ import wave
 
 
 class MicrophoneRecorder:
-	def __init__(self, format=pyaudio.paInt16, chunkSize=1024, rate=16000, silenceThreshold=500, initPipe=False):
-		self.format = format
+	def __init__(self, audioFormat=pyaudio.paInt16, chunkSize=1024, rate=16000, silenceThreshold=500, initPipe=False):
+		self.format = audioFormat
 		self.chunkSize = chunkSize
 		self.rate = rate
 
@@ -37,12 +37,12 @@ class MicrophoneRecorder:
 		self.pipeIsOpened = False
 
 
-	def __isSilent(self, soundData):
+	def _isSilent(self, soundData):
 		"Returns 'True' if below the 'silent' threshold"
 		return max(soundData) < self.silenceThreshold
 
 
-	def __normalize(self, soundData):
+	def _normalize(self, soundData):
 		"Average the volume out"
 		ratios = float(self.maximum) / max(abs(i) for i in soundData)
 
@@ -52,7 +52,7 @@ class MicrophoneRecorder:
 		return r
 
 
-	def __trim(self, soundData):
+	def _trim(self, soundData):
 		soundStarted = False
 		r = array("h")
 
@@ -66,20 +66,20 @@ class MicrophoneRecorder:
 		return r
 
 
-	def __trimWrapper(self, soundData):
+	def _trimWrapper(self, soundData):
 		"Trim the blank spots at the start and end"
 		# Trim to the left
-		soundData = self.__trim(soundData)
+		soundData = self._trim(soundData)
 
 		# Trim to the right
 		soundData.reverse()
-		soundData = self.__trim(soundData)
+		soundData = self._trim(soundData)
 		soundData.reverse()
 
 		return soundData
 
 
-	def __addSilence(self, soundData, seconds):
+	def _addSilence(self, soundData, seconds):
 		"Add silence to the start and end of 'soundData' of length 'seconds' (float)"
 		r = array("h", [0 for _ in range(int(seconds * self.rate))])
 		r.extend(soundData)
@@ -119,7 +119,7 @@ class MicrophoneRecorder:
 				soundData.byteswap()
 			record.extend(soundData)
 
-			silent = self.__isSilent(soundData)
+			silent = self._isSilent(soundData)
 
 			if silent and soundStarted:
 				# print("\rNumber of silent frames: {}".format(silentFrames), end="")
@@ -136,14 +136,14 @@ class MicrophoneRecorder:
 		stream.stop_stream()
 		stream.close()
 
-		record = self.__normalize(record)
-		record = self.__trim(record)
-		record = self.__addSilence(record, 0.5)
+		record = self._normalize(record)
+		record = self._trim(record)
+		record = self._addSilence(record, 0.5)
 
 		wav = self.convertToWAV(sampleWidth, record)
 
 		if toFile:
-			self.recordToFile(wav, sampleWidth, wpath, fileName)
+			self.recordToFile(wav, wpath, fileName)
 
 		self.terminatePipe()
 
@@ -166,7 +166,7 @@ class MicrophoneRecorder:
 		return tempFile.read()
 
 
-	def recordToFile(self, data, width, wpath, fname):
+	def recordToFile(self, data, wpath, fname):
 		"Records from the microphone and outputs the resulting data to 'path'"
 		os.makedirs(wpath, exist_ok=True)
 		fname = fname if fname.endswith(".wav") else "{}.wav".format(fname)

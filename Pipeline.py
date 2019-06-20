@@ -18,7 +18,7 @@ def main():
 	for _ in range(attempts):
 		text = recognizer.processMicrophoneREST()
 		response = linguoCore.send(text)
-		synthesizer.process(response)
+		synthesizer.process(response, voiceIdx=0)
 
 	print()
 	linguoCore.printDialog()

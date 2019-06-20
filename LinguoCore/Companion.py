@@ -1,15 +1,12 @@
-import os, sys
 import requests
 
 import hashlib
 import json
 
-currpath = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(currpath, ".."))
-
-import LinguoCore.Config as CFG
-
-sys.path.pop()
+try:
+	from .Config import CompanionConfig as CFG
+except ImportError:
+	from Config import CompanionConfig as CFG
 
 
 class Companion:
@@ -108,6 +105,7 @@ class Companion:
 def test():
 	companion = Companion()
 
+	print("Ready to chat")
 	while True:
 		text = input()
 		result = companion.send(text)

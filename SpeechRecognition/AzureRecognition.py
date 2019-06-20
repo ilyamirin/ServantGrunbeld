@@ -1,16 +1,13 @@
-import os, sys
 import requests
 
 import azure.cognitiveservices.speech as speechsdk
 
-
-currpath = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(currpath, ".."))
-
 from Microphone import MicrophoneRecorder
-import SpeechRecognition.Config as CFG
 
-sys.path.pop()
+try:
+	from .Config import AzureCredentials, AzureConfig
+except ImportError:
+	from Config import AzureCredentials, AzureConfig
 
 
 class BadFileFormat(Exception):
@@ -18,24 +15,24 @@ class BadFileFormat(Exception):
 
 
 class AzureRecognizer:
-	def __init__(self, key=CFG.SUBSCRIPTION_KEY, region=CFG.SERVICE_REGION, language=CFG.RUS,
-	             responseFormat=CFG.DETAILED):
+	def __init__(self, key=AzureCredentials.SUBSCRIPTION_KEY, region=AzureCredentials.SERVICE_REGION,
+	             language=AzureConfig.LANG_RUS, responseFormat=AzureConfig.RESPONSE_DETAILED):
 		self.key = key
 		self.region = region
 
 		self.language = language
 		self.format = responseFormat
 
-		self.recognizer = self.__initRecognizer(self.key, self.region)
+		self.recognizer = self._initRecognizer(self.key, self.region)
 		self.microphone = MicrophoneRecorder()
 
 		self.REST = {
-			"base": CFG.REST_BASE_URL,
-			"path": CFG.REST_PATH
+			"base": AzureConfig.REST_BASE_URL,
+			"path": AzureConfig.REST_PATH
 		}
 
 
-	def __initRecognizer(self, key, region):
+	def _initRecognizer(self, key, region):
 		speechConfig = speechsdk.SpeechConfig(subscription=key, region=region,
 		                                      speech_recognition_language=self.language)
 
@@ -44,7 +41,7 @@ class AzureRecognizer:
 		return recognizer
 
 
-	def __sendRequest(self, data):
+	def _sendRequest(self, data):
 		# TODO нужно ограничть длину записи до 10 секунд (требования rest api azure),
 		#  либо использовать другой вид запроса
 		headers = {
@@ -82,7 +79,7 @@ class AzureRecognizer:
 		#TODO у аудио-дорожки должны быть определённые характеристики: битрейт и кодек
 			raise TypeError("Method takes either sound bytearray or .wav file")
 
-		response = self.__sendRequest(record)
+		response = self._sendRequest(record)
 		self._handleResponseREST(response.status_code)
 
 		result = response.json().get("NBest", "")
