@@ -20,7 +20,10 @@ class RetinaFace:
 	def __init__(self, prefix, epoch, ctxID=0):
 		self.ctxID = ctxID
 
-		self.ctx = mx.gpu(ctxID)
+		if self.ctxID >= 0:
+			self.ctx = mx.gpu(ctxID)
+		else:
+			self.ctx = mx.cpu()
 
 		self._featStrideFPN = [32, 16, 8]
 		self.keysFPN = ['stride%s' % s for s in self._featStrideFPN]

@@ -14,6 +14,7 @@ def main():
 	print("Synthesizer is ready")
 
 	print("Here you go")
+
 	attempts = 3
 	for _ in range(attempts):
 		text = recognizer.processMicrophoneREST()

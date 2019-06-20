@@ -1,6 +1,10 @@
 import requests
 
-import azure.cognitiveservices.speech as speechsdk
+try:
+	import azure.cognitiveservices.speech as speechsdk
+	hasAzureSDK = True
+except ImportError:
+	hasAzureSDK = False
 
 from Microphone import MicrophoneRecorder
 
@@ -9,8 +13,12 @@ try:
 except ImportError:
 	from Config import AzureCredentials, AzureConfig
 
-
+hasAzureSDK = False
 class BadFileFormat(Exception):
+	pass
+
+
+class PackageIsNotInstalled(Exception):
 	pass
 
 
@@ -71,7 +79,10 @@ class AzureRecognizer:
 
 
 	def processMicrophoneSDK(self):
-		return self.recognizer.recognize_once()
+		if hasAzureSDK:
+			return self.recognizer.recognize_once()
+		else:
+			raise PackageIsNotInstalled("Azure cognitive speech SDK is not installed")
 
 
 	def processAudio(self, record):
@@ -120,6 +131,7 @@ class AzureRecognizer:
 			print("Speech Recognition canceled: {}".format(cancellation_details.reason))
 			if cancellation_details.reason == speechsdk.CancellationReason.Error:
 				print("Error details: {}".format(cancellation_details.error_details))
+
 
 
 def testAzureSDK(recognizer):
