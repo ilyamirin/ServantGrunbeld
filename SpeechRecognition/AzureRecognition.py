@@ -10,10 +10,12 @@ from Microphone import MicrophoneRecorder
 
 try:
 	from .Config import AzureCredentials, AzureConfig
+	from .RecognitionModule import Recognizer
 except ImportError:
 	from Config import AzureCredentials, AzureConfig
+	from RecognitionModule import Recognizer
 
-hasAzureSDK = False
+
 class BadFileFormat(Exception):
 	pass
 
@@ -22,13 +24,15 @@ class PackageIsNotInstalled(Exception):
 	pass
 
 
-class AzureRecognizer:
+class AzureRecognizer(Recognizer):
 	def __init__(self, key=AzureCredentials.SUBSCRIPTION_KEY, region=AzureCredentials.SERVICE_REGION,
 	             language=AzureConfig.LANG_RUS, responseFormat=AzureConfig.RESPONSE_DETAILED):
+
+		super().__init__(language=language)
+
 		self.key = key
 		self.region = region
 
-		self.language = language
 		self.format = responseFormat
 
 		self.recognizer = self._initRecognizer(self.key, self.region)
@@ -78,13 +82,6 @@ class AzureRecognizer:
 			print("Not found")
 
 
-	def processMicrophoneSDK(self):
-		if hasAzureSDK:
-			return self.recognizer.recognize_once()
-		else:
-			raise PackageIsNotInstalled("Azure cognitive speech SDK is not installed")
-
-
 	def processAudio(self, record):
 		if not isinstance(record, bytes):
 		#TODO у аудио-дорожки должны быть определённые характеристики: битрейт и кодек
@@ -100,7 +97,14 @@ class AzureRecognizer:
 		return result
 
 
-	def processMicrophoneREST(self):
+	def processMicrophoneSDK(self):
+		if hasAzureSDK:
+			return self.recognizer.recognize_once()
+		else:
+			raise PackageIsNotInstalled("Azure cognitive speech SDK is not installed")
+
+
+	def processMicrophone(self):
 		self.microphone.initPipe()
 		record = self.microphone.record()
 
@@ -109,14 +113,14 @@ class AzureRecognizer:
 		return result
 
 
-	def processAudioFile(self, record):
-		if not record.endswith(".wav"):
+	def processAudioFile(self, file):
+		if not file.endswith(".wav"):
 			raise BadFileFormat("File format has to be .wav")
 
-		with open(record, "rb") as rec:
-			record = rec.read()
+		with open(file, "rb") as rec:
+			file = rec.read()
 
-		result = self.processAudio(record)
+		result = self.processAudio(file)
 
 		return result
 
@@ -148,14 +152,14 @@ def testAzureREST(recognizer):
 
 	print("Here you go")
 	for _ in range(attempts):
-		result = recognizer.processMicrophoneREST()
+		result = recognizer.processMicrophone()
 		print("Recognized:", result)
 
 
 def main():
 	recognizer = AzureRecognizer()
 
-	testAzureSDK(recognizer)
+	# testAzureSDK(recognizer)
 	testAzureREST(recognizer)
 	# result = recognizer.processAudioFile(r"D:\git_projects\FEFU\AssistantPipeline\Temp\new_record.wav")
 	# print(result)

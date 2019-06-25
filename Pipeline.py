@@ -17,7 +17,7 @@ def main():
 
 	attempts = 3
 	for _ in range(attempts):
-		text = recognizer.processMicrophoneREST()
+		text = recognizer.processMicrophone()
 		response = linguoCore.send(text)
 		synthesizer.process(response, voiceIdx=0)
 

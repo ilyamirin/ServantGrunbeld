@@ -8,13 +8,18 @@ from AudioPlayer import Player
 
 try:
 	from .Config import AzureCredentials, AzureConfig
+	from .SynthesisModule import Synthesizer
 except ImportError:
 	from Config import AzureCredentials, AzureConfig
+	from SynthesisModule import Synthesizer
 
 
-class AzureSynthesizer:
+class AzureSynthesizer(Synthesizer):
 	def __init__(self, key=AzureCredentials.SUBSCRIPTION_KEY, region=AzureCredentials.SERVICE_REGION,
 	             language=AzureConfig.LANG_RUS):
+
+		super().__init__(language=language)
+
 		self.key = key
 		self.region = region
 
