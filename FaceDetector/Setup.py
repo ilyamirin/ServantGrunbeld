@@ -2,8 +2,6 @@ import os, sys
 import subprocess
 import urllib.request
 
-from colorama import Fore, Style
-
 _curPath = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(_curPath, ".."))
 
@@ -24,23 +22,22 @@ if not "PYCHARM_HOSTED" in os.environ:
 def checkCuda():
 	allowedCudaVersions = [101, 100, 92, 90, 80]
 
-	print(Fore.LIGHTBLUE_EX + "Checking CUDA ..." + Style.RESET_ALL)
+	print("Checking CUDA ...")
 
 	try:
 		versionFull = subprocess.getoutput("nvcc --version").split()[-1]
-		print(Fore.LIGHTGREEN_EX + "CUDA '%s' is found" % versionFull + Style.RESET_ALL)
+		print("CUDA '%s' is found" % versionFull)
 		version = "".join(versionFull.split(".")[:2]).replace("V", "")
 
 		if int(version) not in allowedCudaVersions:
 			raise RestrictedVersion
 
 	except RestrictedVersion:
-		print(Fore.RED + "CUDA version {} is not suitable for mxnet installation:\n".
-		      format(versionFull) + Style.RESET_ALL)
+		print("CUDA version {} is not suitable for mxnet installation:\n".format(versionFull))
 		version = None
 
 	except Exception as e:
-		print(Fore.RED + "CUDA library is not found with error:\n" + Style.RESET_ALL + str(e))
+		print("CUDA library is not found with error:\n" + str(e))
 		version = None
 
 	return version
@@ -92,16 +89,16 @@ def downloadWeights():
 	with open(os.path.join(folder, "weightsURL.txt"), "r") as urlf:
 		url = urlf.read().strip()
 
-	print(Fore.LIGHTBLUE_EX + "Downloading model weights ..." + Style.RESET_ALL)
+	print("Downloading model weights ...")
 
 	try:
 		downloadFile(url, filename)
 
 	except Exception as e:
-		print(Fore.RED + "Weights downloading error:\n" + Style.RESET_ALL + str(e))
+		print("Weights downloading error:\n" + str(e))
 		return
 
-	print(Fore.LIGHTGREEN_EX + "\nModel weights '%s' has been successfully placed in: " + Style.RESET_ALL + folder)
+	print("\nModel weights '%s' has been successfully placed in: " + folder)
 
 
 def setup():
