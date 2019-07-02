@@ -4,13 +4,16 @@ import io
 from sys import byteorder
 from array import array
 from struct import pack
+from _thread import start_new_thread
 
 import pyaudio
 import wave
 
 
 class MicrophoneRecorder:
-	def __init__(self, audioFormat=pyaudio.paInt16, chunkSize=1024, rate=16000, silenceThreshold=500, initPipe=False):
+	def __init__(self, audioFormat=pyaudio.paInt16, chunkSize=1024, rate=16000, silenceThreshold=500, initPipe=False,
+	             name="your_microphone"):
+
 		self.format = audioFormat
 		self.chunkSize = chunkSize
 		self.rate = rate
@@ -23,8 +26,19 @@ class MicrophoneRecorder:
 		self.pipe = None
 		self.pipeIsOpened = False
 
+		self.name = name
+
 		if initPipe:
 			self.initPipe()
+
+
+	def __enter__(self):
+		self.initPipe()
+		return self
+
+
+	def __exit__(self, type, val, traceback):
+		self.terminatePipe()
 
 
 	def initPipe(self):
@@ -44,26 +58,24 @@ class MicrophoneRecorder:
 
 	def _normalize(self, soundData):
 		"Average the volume out"
+		if len(soundData) == 0:
+			print("Warning! Record is empty")
+			return soundData
+
 		ratios = float(self.maximum) / max(abs(i) for i in soundData)
 
-		r = array("h")
-		for i in soundData:
-			r.append(int(i * ratios))
-		return r
+		soundData = [int(i * ratios) for i in soundData]
+
+		return soundData
 
 
 	def _trim(self, soundData):
-		soundStarted = False
-		r = array("h")
+		for idx, value in enumerate(soundData):
+			if abs(value) > self.silenceThreshold:
+				soundData = soundData[idx:]
+				break
 
-		for i in soundData:
-			if not soundStarted and abs(i) > self.silenceThreshold:
-				soundStarted = True
-				r.append(i)
-
-			elif soundStarted:
-				r.append(i)
-		return r
+		return soundData
 
 
 	def _trimWrapper(self, soundData):
@@ -87,7 +99,75 @@ class MicrophoneRecorder:
 		return r
 
 
-	def record(self, toFile=False, **params):
+	def recordVoice(self, stream, record, check: list=None):
+		soundStarted = False
+		doRecord = True
+		silentFrames = 0
+
+		while doRecord:
+			soundData = array("h", stream.read(self.chunkSize))
+			if byteorder == "big":
+				soundData.byteswap()
+
+			silent = self._isSilent(soundData)
+
+			if not silent:
+				if not soundStarted:
+					soundStarted = True
+				else:
+					record.extend(soundData)
+					silentFrames = 0
+			elif silent and soundStarted:
+				silentFrames += 1
+
+			if check is not None:
+				doRecord = not check
+			else:
+				doRecord = silentFrames < self.silentFramesThreshold
+
+
+	def recordManual(self, toFile=False, wpath="./Temp", fileName="new_record.wav", normalize=True, trim=True,
+	                 addSilence=True):
+
+		if not self.pipeIsOpened:
+			self.initPipe()
+
+		stream = self.pipe.open(format=self.format, channels=1, rate=self.rate,
+			                        input=True, output=True, frames_per_buffer=self.chunkSize)
+
+		record = array("h")
+
+		print("Press 'Enter' in command prompt to start (press 'Enter' in command prompt again to finish)")
+		input()
+
+		print("started... ", end="")
+
+		aList = []
+		start_new_thread(function=inputThread, args=(aList,))
+		self.recordVoice(stream, record, aList)
+
+		print("stopped")
+
+		sampleWidth = self.pipe.get_sample_size(self.format)
+		stream.stop_stream()
+		stream.close()
+
+		record = self._normalize(record) if normalize else record
+		record = self._trimWrapper(record) if trim else record
+		record = self._addSilence(record, 0.5) if addSilence else record
+
+		wav = self.convertToWAV(sampleWidth, record)
+
+		if toFile:
+			self.recordToFile(wav, wpath, fileName)
+
+		self.terminatePipe()
+
+		return wav
+
+
+	def recordAuto(self, toFile=False, wpath="./Temp", fileName="new_record.wav", normalize=True, trim=True,
+	               addSilence=True):
 		"""
 		Record a word or words from the microphone and
 		return the data as an array of signed shorts.
@@ -97,8 +177,6 @@ class MicrophoneRecorder:
 		blank sound to make sure VLC et al can play
 		it without getting chopped off.
 		"""
-		wpath = params.get("wpath", "./Temp")
-		fileName = params.get("fileName", "new_record.wav")
 
 		if not self.pipeIsOpened:
 			self.initPipe()
@@ -106,39 +184,19 @@ class MicrophoneRecorder:
 		stream = self.pipe.open(format=self.format, channels=1, rate=self.rate,
 		                        input=True, output=True, frames_per_buffer=self.chunkSize)
 
-		silentFrames = 0
-		soundStarted = False
-
 		record = array("h")
 
 		print("recording...", end="")
-		while True:
-			# little endian, signed short
-			soundData = array("h", stream.read(self.chunkSize))
-			if byteorder == "big":
-				soundData.byteswap()
-			record.extend(soundData)
-
-			silent = self._isSilent(soundData)
-
-			if silent and soundStarted:
-				# print("\rNumber of silent frames: {}".format(silentFrames), end="")
-				silentFrames += 1
-			elif not silent and not soundStarted:
-				soundStarted = True
-
-			if soundStarted and silentFrames > self.silentFramesThreshold:
-				break
-
+		self.recordVoice(stream, record)
 		print("stop")
 
 		sampleWidth = self.pipe.get_sample_size(self.format)
 		stream.stop_stream()
 		stream.close()
 
-		record = self._normalize(record)
-		record = self._trim(record)
-		record = self._addSilence(record, 0.5)
+		record = self._normalize(record) if normalize else record
+		record = self._trimWrapper(record) if trim else record
+		record = self._addSilence(record, 0.5) if addSilence else record
 
 		wav = self.convertToWAV(sampleWidth, record)
 
@@ -177,10 +235,16 @@ class MicrophoneRecorder:
 			wf.write(data)
 
 
+def inputThread(aList):
+	a = input()
+	aList.append(a)
+
+
 def main():
-	microphone = MicrophoneRecorder()
-	microphone.initPipe()
-	microphone.record(toFile=True)
+	with MicrophoneRecorder() as microphone:
+		microphone.recordAuto(toFile=True)
+
+	microphone.recordManual(toFile=True)
 
 
 if __name__ == "__main__":

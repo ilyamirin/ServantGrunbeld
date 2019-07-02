@@ -19,6 +19,15 @@ class Player:
 			self.initPipe()
 
 
+	def __enter__(self):
+		self.initPipe()
+		return self
+
+
+	def __exit__(self, type, val, traceback):
+		self.terminatePipe()
+
+
 	def initPipe(self):
 		self.pipe = pyaudio.PyAudio()
 		self.pipeIsOpened = True
@@ -78,8 +87,8 @@ def testTandem():
 	player = Player()
 
 	print("Please speak")
-	player.playAudio(microphone.record())
+	player.playAudio(microphone.recordAuto())
 
 
 if __name__ == "__main__":
-	test()
+	testTandem()
