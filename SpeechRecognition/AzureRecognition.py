@@ -6,7 +6,7 @@ try:
 except ImportError:
 	hasAzureSDK = False
 
-from Microphone import MicrophoneRecorder
+from Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT, AUTO_SILENCE_LIMIT
 
 try:
 	from .Config import AzureCredentials, AzureConfig
@@ -25,7 +25,7 @@ class PackageIsNotInstalled(Exception):
 
 
 class AzureRecognizer(Recognizer):
-	def __init__(self, key=AzureCredentials.SUBSCRIPTION_KEY, region=AzureCredentials.SERVICE_REGION,
+	def __init__(self, sdkMode=False, key=AzureCredentials.SUBSCRIPTION_KEY, region=AzureCredentials.SERVICE_REGION,
 	             language=AzureConfig.LANG_RUS, responseFormat=AzureConfig.RESPONSE_DETAILED):
 
 		super().__init__(language=language)
@@ -35,7 +35,7 @@ class AzureRecognizer(Recognizer):
 
 		self.format = responseFormat
 
-		self.recognizer = self._initRecognizer(self.key, self.region)
+		self.recognizer = self._initRecognizer(self.key, self.region) if sdkMode else None
 		self.microphone = MicrophoneRecorder()
 
 		self.REST = {
@@ -106,7 +106,7 @@ class AzureRecognizer(Recognizer):
 
 	def processMicrophone(self):
 		self.microphone.initPipe()
-		record = self.microphone.record()
+		record = self.microphone.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=10)
 
 		result = self.processAudio(record)
 
