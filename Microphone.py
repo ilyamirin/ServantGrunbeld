@@ -10,6 +10,12 @@ import pyaudio
 import wave
 
 
+AUTO_SILENCE_LIMIT = "silent_counting"
+AUTO_DURATION_LIMIT = "duration_limit"
+MANUAL_KEYBOARD = "keyboard"
+
+
+
 class MicrophoneRecorder:
 	def __init__(self, audioFormat=pyaudio.paInt16, chunkSize=1024, rate=16000, silenceThreshold=500, initPipe=False,
 	             name="your_microphone"):
@@ -19,7 +25,6 @@ class MicrophoneRecorder:
 		self.rate = rate
 
 		self.silenceThreshold = silenceThreshold
-		self.silentFramesThreshold = 20
 
 		self.maximum = 16384
 
@@ -52,12 +57,10 @@ class MicrophoneRecorder:
 
 
 	def _isSilent(self, soundData):
-		"Returns 'True' if below the 'silent' threshold"
 		return max(soundData) < self.silenceThreshold
 
 
 	def _normalize(self, soundData):
-		"Average the volume out"
 		if len(soundData) == 0:
 			print("Warning! Record is empty")
 			return soundData
@@ -79,7 +82,6 @@ class MicrophoneRecorder:
 
 
 	def _trimWrapper(self, soundData):
-		"Trim the blank spots at the start and end"
 		# Trim to the left
 		soundData = self._trim(soundData)
 
@@ -92,14 +94,15 @@ class MicrophoneRecorder:
 
 
 	def _addSilence(self, soundData, seconds):
-		"Add silence to the start and end of 'soundData' of length 'seconds' (float)"
 		r = array("h", [0 for _ in range(int(seconds * self.rate))])
 		r.extend(soundData)
 		r.extend([0 for _ in range(int(seconds * self.rate))])
 		return r
 
 
-	def recordVoice(self, stream, record, check: list=None):
+	def recordVoice(self, stream, record, mode, **kwargs):
+		threshold = kwargs.get("threshold", None)
+
 		soundStarted = False
 		doRecord = True
 		silentFrames = 0
@@ -120,10 +123,14 @@ class MicrophoneRecorder:
 			elif silent and soundStarted:
 				silentFrames += 1
 
-			if check is not None:
-				doRecord = not check
+			if mode == MANUAL_KEYBOARD:
+				doRecord = not threshold
+			elif mode == AUTO_SILENCE_LIMIT:
+				doRecord = silentFrames < threshold
+			elif mode == AUTO_DURATION_LIMIT:
+				doRecord = len(record) / self.rate < threshold
 			else:
-				doRecord = silentFrames < self.silentFramesThreshold
+				raise ValueError
 
 
 	def recordManual(self, toFile=False, wpath="./Temp", fileName="new_record.wav", normalize=True, trim=True,
@@ -144,7 +151,7 @@ class MicrophoneRecorder:
 
 		aList = []
 		start_new_thread(function=inputThread, args=(aList,))
-		self.recordVoice(stream, record, aList)
+		self.recordVoice(stream, record, MANUAL_KEYBOARD, threshold=aList)
 
 		print("stopped")
 
@@ -166,17 +173,8 @@ class MicrophoneRecorder:
 		return wav
 
 
-	def recordAuto(self, toFile=False, wpath="./Temp", fileName="new_record.wav", normalize=True, trim=True,
-	               addSilence=True):
-		"""
-		Record a word or words from the microphone and
-		return the data as an array of signed shorts.
-
-		Normalizes the audio, trims silence from the
-		start and end, and pads with 0.5 seconds of
-		blank sound to make sure VLC et al can play
-		it without getting chopped off.
-		"""
+	def recordAuto(self, mode=AUTO_SILENCE_LIMIT, threshold=20, toFile=False, wpath="./Temp", fileName="new_record.wav",
+	               normalize=True, trim=True, addSilence=True):
 
 		if not self.pipeIsOpened:
 			self.initPipe()
@@ -187,7 +185,7 @@ class MicrophoneRecorder:
 		record = array("h")
 
 		print("recording...", end="")
-		self.recordVoice(stream, record)
+		self.recordVoice(stream, record, mode, threshold=threshold)
 		print("stop")
 
 		sampleWidth = self.pipe.get_sample_size(self.format)
@@ -225,7 +223,6 @@ class MicrophoneRecorder:
 
 
 	def recordToFile(self, data, wpath, fname):
-		"Records from the microphone and outputs the resulting data to 'path'"
 		os.makedirs(wpath, exist_ok=True)
 		fname = fname if fname.endswith(".wav") else "{}.wav".format(fname)
 
@@ -242,9 +239,9 @@ def inputThread(aList):
 
 def main():
 	with MicrophoneRecorder() as microphone:
-		microphone.recordAuto(toFile=True)
+		microphone.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=15, toFile=True)
 
-	microphone.recordManual(toFile=True)
+	# microphone.recordManual(toFile=True)
 
 
 if __name__ == "__main__":

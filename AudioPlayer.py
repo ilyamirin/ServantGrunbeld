@@ -39,7 +39,7 @@ class Player:
 
 
 	def playAudioFile(self, file):
-		if not file.endswith(".wav"):
+		if not file.lower().endswith(".wav"):
 			raise BadFileFormat("File format has to be .wav")
 
 		audio = wave.open(file, "rb")
@@ -78,7 +78,7 @@ class Player:
 
 def test():
 	player = Player()
-	player.playAudioFile(r"D:\git_projects\FEFU\AssistantPipeline\Temp\new_record.wav")
+	player.playAudioFile(r"D:\data\Speech\Voices_audio\MySets\tanya\ver\tanya_ver1.wav")
 
 
 def testTandem():
@@ -91,4 +91,4 @@ def testTandem():
 
 
 if __name__ == "__main__":
-	testTandem()
+	test()
