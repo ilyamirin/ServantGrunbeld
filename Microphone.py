@@ -163,7 +163,7 @@ class MicrophoneRecorder:
 		record = self._trimWrapper(record) if trim else record
 		record = self._addSilence(record, 0.5) if addSilence else record
 
-		wav = self.convertToWAV(sampleWidth, record)
+		wav = self.convertToWAVFile(sampleWidth, record)
 
 		if toFile:
 			self.recordToFile(wav, wpath, fileName)
@@ -196,7 +196,7 @@ class MicrophoneRecorder:
 		record = self._trimWrapper(record) if trim else record
 		record = self._addSilence(record, 0.5) if addSilence else record
 
-		wav = self.convertToWAV(sampleWidth, record)
+		wav = self.convertToWAVFile(sampleWidth, record)
 
 		if toFile:
 			self.recordToFile(wav, wpath, fileName)
@@ -206,7 +206,7 @@ class MicrophoneRecorder:
 		return wav
 
 
-	def convertToWAV(self, width, data):
+	def convertToWAVFile(self, width, data):
 		tempFile = io.BytesIO()
 
 		data = pack("<" + ("h" * len(data)), *data)
@@ -219,17 +219,17 @@ class MicrophoneRecorder:
 
 		tempFile.seek(0)
 
-		return tempFile.read()
+		return tempFile
 
 
-	def recordToFile(self, data, wpath, fname):
+	def recordToFile(self, data:io.BytesIO, wpath, fname):
 		os.makedirs(wpath, exist_ok=True)
 		fname = fname if fname.endswith(".wav") else "{}.wav".format(fname)
 
 		fullPath = os.path.join(wpath, fname)
 
 		with open(fullPath, "wb") as wf:
-			wf.write(data)
+			wf.write(data.read())
 
 
 def inputThread(aList):

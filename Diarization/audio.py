@@ -16,6 +16,10 @@ WEBRTC = "webrtc"
 
 def preprocess_file(file, vad=LIBROSA):
 	source_sr, wav = audio_read(file)
+	wav = wav / (2 * max(abs(np.min(wav)), np.max(wav)))
+	wav = wav.astype(np.float32)
+
+	# wav, source_sr = librosa.load(file, sr=None)
 
 	if source_sr is not None and source_sr != sampling_rate:
 		wav = librosa.resample(wav, source_sr, sampling_rate)

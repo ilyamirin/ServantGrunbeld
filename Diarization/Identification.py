@@ -22,7 +22,7 @@ class SpeakerIdentifier:
 		raise NotImplementedError
 
 
-	def enrollFromMicrophone(self):
+	def enrollFromMicrophone(self, name):
 		pass
 
 

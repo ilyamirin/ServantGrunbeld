@@ -5,11 +5,13 @@ import numpy as np
 
 
 class DataBase:
-	def __init__(self, filepath, showBase=True):
+	def __init__(self, filepath, showBase=True, locked=False):
 		self.filepath = filepath
 		self._checkFileExistence(filepath)
 
 		self.base = self._showBase() if showBase else None
+
+		self.locked = locked
 
 
 	def __enter__(self):
@@ -37,6 +39,14 @@ class DataBase:
 				return file[item][:]
 
 
+	def __len__(self):
+		if self.base is not None:
+			return len(self.base)
+		else:
+			with self._open(self.filepath, "r") as file:
+				return len(file.keys())
+
+
 	@staticmethod
 	def _checkFileExistence(filepath):
 		if not os.path.exists(filepath):
@@ -57,6 +67,9 @@ class DataBase:
 
 
 	def put(self, name, value):
+		if self.locked:
+			raise PermissionError("Data base is locked")
+
 		with self._open(self.filepath, "a") as file:
 			try:
 				if name in file:
@@ -73,7 +86,7 @@ class DataBase:
 				print(e)
 
 
-	def get(self, name):
+	def get(self, name, value=None):
 		try:
 			if self.base is not None:
 				return self.base[name]
@@ -81,4 +94,5 @@ class DataBase:
 				with self._open(self.filepath, "r") as file:
 					return file[name][:]
 		except KeyError:
-			print("No such user in base")
+			print("User {} isn't represented in base".format(name))
+			return value
