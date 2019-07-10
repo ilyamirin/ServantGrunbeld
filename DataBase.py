@@ -9,7 +9,9 @@ class DataBase:
 		self.filepath = filepath
 		self._checkFileExistence(filepath)
 
-		self.base = self._showBase() if showBase else None
+		self.base = None
+		if showBase:
+			self.base = self._showBase()
 
 		self.locked = locked
 
@@ -24,27 +26,19 @@ class DataBase:
 
 
 	def __iter__(self):
-		if self.base is not None:
-			return iter(self.base)
-		else:
-			with self._open(self.filepath, "r") as file:
-				return iter(list(file.keys()))
+		return iter(self.keys())
 
 
 	def __getitem__(self, item):
 		if self.base is not None:
-			return self.base[item]
+			return self._getNested(self.base, item)
 		else:
 			with self._open(self.filepath, "r") as file:
 				return file[item][:]
 
 
 	def __len__(self):
-		if self.base is not None:
-			return len(self.base)
-		else:
-			with self._open(self.filepath, "r") as file:
-				return len(file.keys())
+		return len(self.keys())
 
 
 	@staticmethod
@@ -61,12 +55,63 @@ class DataBase:
 		return h5py.File(filepath, mode)
 
 
+	@staticmethod
+	def _getFullKeys(base, keys=None, keyString=None):
+		keys = [] if keys is None else keys
+
+		if keyString is not None and (isinstance(base, np.ndarray) or isinstance(base, h5py.Dataset)):
+			keys.append(keyString)
+		else:
+			for key in base.keys():
+				keyStringExtended = f"{keyString}/{key}" if keyString is not None else f"{key}"
+				keys = DataBase._getFullKeys(base[key], keys, keyStringExtended)
+
+		return keys
+
+
+	@staticmethod
+	def _putNested(base, keys, value):
+		keys = keys.split("/")
+
+		key = keys.pop(0)
+
+		if not keys:
+			base[key] = value
+		else:
+			base[key] = base.get(key, {})
+			DataBase._putNested(base[key], "/".join(keys), value)
+
+
+	@staticmethod
+	def _getNested(base, keys):
+		keys = keys.split("/")
+
+		key = keys.pop(0)
+
+		if not keys:
+			return base[key]
+		else:
+			return DataBase._getNested(base[key], "/".join(keys))
+
+
 	def _showBase(self):
 		with self._open(self.filepath, "r") as file:
-			return {name:file[name][:] for name in file.keys()}
+			base = {}
+			for key in self.keys():
+				self._putNested(base, key, file[key][:])
+
+			return base
 
 
-	def put(self, name, value):
+	def keys(self):
+		if self.base is not None:
+			return self._getFullKeys(self.base)
+		else:
+			with self._open(self.filepath, "r") as file:
+				return self._getFullKeys(file)
+
+
+	def put(self, name, value, shape=(256,)):
 		if self.locked:
 			raise PermissionError("Data base is locked")
 
@@ -77,10 +122,10 @@ class DataBase:
 					data[...] = value
 
 				else:
-					file.create_dataset(name=name, shape=(256,), data=value, dtype=np.float32, chunks=True)
+					file.create_dataset(name=name, shape=shape, data=value, dtype=np.float32, chunks=True)
 
 				if self.base is not None:
-					self.base[name] = value
+					self._putNested(self.base, name, value)
 
 			except Exception as e:
 				print(e)
@@ -89,10 +134,30 @@ class DataBase:
 	def get(self, name, value=None):
 		try:
 			if self.base is not None:
-				return self.base[name]
+				return self._getNested(self.base, name)
 			else:
 				with self._open(self.filepath, "r") as file:
-					return file[name][:]
+					result = file[name]
+
+					if not isinstance(result, h5py.Dataset):
+						raise TypeError
+
+					return result[:]
+
 		except KeyError:
 			print("User {} isn't represented in base".format(name))
 			return value
+		except TypeError:
+			print("Variable 'name' must be full and lead to embedding")
+			return value
+
+
+def main():
+	db = DataBase(r"D:\git_projects\FEFU\PipeleneDraft\Diarization\Temp\users_test.hdf", showBase=True)
+
+	for key in db:
+		print(key)
+
+
+if __name__ == "__main__":
+	main()

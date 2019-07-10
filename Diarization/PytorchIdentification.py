@@ -1,5 +1,5 @@
 import os
-import io
+import string
 
 import numpy as np
 from numpy.linalg import norm
@@ -51,12 +51,26 @@ class Identifier(SpeakerIdentifier):
 		return self._getEmbedding(audio)
 
 
-	def _checkPresence(self, name):
-		pass
-
-
 	def _cosineSimilarity(self, vector1, vector2):
 		return 1 - np.inner(vector1, vector2) / (norm(vector1) * norm(vector2))
+
+
+	def _checkIncomingName(self, name):
+		name = name.split("/")
+
+		if not name[-1] in string.digits and len(name) == 1:
+			name = [name[-1], str(len(self.dataBase.get("/".join(name), {})))]
+
+		return "/".join(name)
+
+
+	def _checkOutgouingName(self, name):
+		name = name.split("/")
+
+		if name[-1] in string.digits:
+			name = name[:-1]
+
+		return " ".join(name)
 
 
 	def identify(self, vector):
@@ -67,7 +81,7 @@ class Identifier(SpeakerIdentifier):
 		minScore = 1
 		result = None
 		for name in self.dataBase:
-			value = self.dataBase[name][:]
+			value = self.dataBase.get(name)
 
 			score = self._cosineSimilarity(vector, value)
 			# score = np.sum(np.square(np.subtract(vector, value)), 0)
@@ -86,20 +100,22 @@ class Identifier(SpeakerIdentifier):
 			audio = micro.recordAuto(addSilence=False)
 
 		results, scores = self.identifyViaFile(audio)
+		results = self._checkOutgouingName(results)
 
 		return results, scores
 
 
 	def identifyViaFile(self, filepath):
 		results, scores = self.identify(self._getEmbeddingFromFile(filepath))
+		results = self._checkOutgouingName(results)
 
 		return results, scores
 
 
-	def enroll(self, name, vector, rewrite=False):
+	def enroll(self, name, vector, overwrite=False):
 		assert self.dataBase is not None
 
-		if not rewrite:
+		if not overwrite:
 			vectorOld = self.dataBase.get(name, 0)
 			vector = np.average(np.array((vector, vectorOld)), axis=0)
 
@@ -107,11 +123,13 @@ class Identifier(SpeakerIdentifier):
 		print("User {} has been enrolled".format(name))
 
 
-	def enrollFromMicrophone(self, name=None):
+	def enrollFromMicrophone(self, name):
 		with self.microphone as micro:
 			audio = micro.recordManual()
 
 		embedding = self._getEmbeddingFromFile(audio)
+
+		name = self._checkIncomingName(name)
 		self.enroll(name, embedding)
 
 
@@ -120,12 +138,13 @@ class Identifier(SpeakerIdentifier):
 
 		vector = []
 		for file in files:
-			embeddings = self._getEmbeddingFromFile(file)
+			embeddings = self._getEmbeddingFromFile(os.path.join(folder, file))
 
 			vector.append(embeddings)
 
 		vector = np.average(vector, axis=0)
 
+		name = self._checkIncomingName(name)
 		self.enroll(name, vector)
 
 
@@ -161,8 +180,22 @@ def identifyAuto(embedder:Identifier, usersPath):
 
 
 def main():
+	usersEnr = {
+		"Anton/Dobryshev": r"D:\data\Speech\Voices_audio\MySets\anton\enr",
+		"Alina": r"D:\data\Speech\Voices_audio\MySets\alina\enr",
+		"Tanya": r"D:\data\Speech\Voices_audio\MySets\tanya\enr",
+		"Ilya": r"D:\data\Speech\Voices_audio\MySets\ilya\enr"
+	}
+
+	usersVer = {
+		"Anton/Drobyshev": r"D:\data\Speech\Voices_audio\MySets\anton\ver",
+		"Alina": r"D:\data\Speech\Voices_audio\MySets\alina\ver",
+		"Tanya": r"D:\data\Speech\Voices_audio\MySets\tanya\ver",
+		"Ilya": r"D:\data\Speech\Voices_audio\MySets\ilya\ver"
+	}
+
 	dataBase = DataBase(
-		filepath=r"./Temp/users_extended.hdf",
+		filepath=r"./Temp/users_test2.hdf",
 		showBase=True
 	)
 
@@ -171,7 +204,7 @@ def main():
 		dataBase=dataBase
 	)
 
-	# enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+	enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
 	identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
 
 	# enroll(embedder, usersEnr)
