@@ -34,7 +34,7 @@ class KaldiConfig:
 
 	# Length of chunk size in seconds, that we process. (float, default = 0.18)
 	# --chunk-length
-	chunk_length = 0.18
+	chunk_length_sec = 0.18
 
 	# If True, turn on debug for the neural net computation (very verbose!)
 	# Will be turned on regardless if --verbose >= 5 (bool, default = False)
@@ -175,6 +175,8 @@ class KaldiConfig:
 	# Setting used in decoder to control hash behavior (float, default = 2)
 	# --hash-ratio
 	hash_ratio = 2
+
+	host = "127.0.0.1"
 
 	# Configuration file for online iVector extraction, see class
 	# OnlineIvectorExtractionConfig in the code (string, default = "")
@@ -342,7 +344,7 @@ class KaldiConfig:
 
 	# Port number the server will listen on. (int, default = 5050)
 	# --port-num
-	port_num = 5050
+	port = 5063
 
 	# Interval (in frames) at which to prune tokens (int, default = 25)
 	# --prune-interval
@@ -360,6 +362,4 @@ class KaldiConfig:
 	# --word-determinize
 	word_determinize = "true"
 
-	microphone_frames_per_chunk = int(samp_freq * chunk_length)
-
-
+	chunk_length = int(samp_freq * chunk_length_sec)
