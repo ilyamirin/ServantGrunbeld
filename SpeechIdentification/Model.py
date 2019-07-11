@@ -1,12 +1,18 @@
-from params_model import *
-from params_data import *
-from scipy.interpolate import interp1d
-from sklearn.metrics import roc_curve
-from torch.nn.utils import clip_grad_norm_
-from scipy.optimize import brentq
-from torch import nn
 import numpy as np
+
+from sklearn.metrics import roc_curve
+from scipy.interpolate import interp1d
+from scipy.optimize import brentq
+
 import torch
+
+from torch import nn
+from torch.nn.utils import clip_grad_norm_
+
+try:
+	from .Config import AudioConfig, ModelConfigPytorch
+except ImportError:
+	from Config	import AudioConfig, ModelConfigPytorch
 
 
 class SpeakerEncoder(nn.Module):
@@ -15,12 +21,12 @@ class SpeakerEncoder(nn.Module):
 		self.loss_device = loss_device
 
 		# Network defition
-		self.lstm = nn.LSTM(input_size=mel_n_channels,
-		                    hidden_size=model_hidden_size,
-		                    num_layers=model_num_layers,
+		self.lstm = nn.LSTM(input_size=AudioConfig.mel_n_channels,
+		                    hidden_size=ModelConfigPytorch.model_hidden_size,
+		                    num_layers=ModelConfigPytorch.model_num_layers,
 		                    batch_first=True).to(device)
-		self.linear = nn.Linear(in_features=model_hidden_size,
-		                        out_features=model_embedding_size).to(device)
+		self.linear = nn.Linear(in_features=ModelConfigPytorch.model_hidden_size,
+		                        out_features=ModelConfigPytorch.model_embedding_size).to(device)
 		self.relu = torch.nn.ReLU().to(device)
 
 		# Cosine similarity scaling (with fixed initial parameter values)

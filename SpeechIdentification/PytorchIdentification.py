@@ -2,15 +2,21 @@ import os
 import string
 
 import numpy as np
+
 from numpy.linalg import norm
 
 import torch
 
-from audio import preprocess_file
-from Model import SpeakerEncoder
 from DataBase import DataBase
 
-from Identification import SpeakerIdentifier
+try:
+	from .Identification import SpeakerIdentifier
+	from .AudioPreprocessing import preprocess_file
+	from .Model import SpeakerEncoder
+except ImportError:
+	from Identification import SpeakerIdentifier
+	from AudioPreprocessing import preprocess_file
+	from Model import SpeakerEncoder
 
 
 class Identifier(SpeakerIdentifier):
@@ -51,7 +57,8 @@ class Identifier(SpeakerIdentifier):
 		return self._getEmbedding(audio)
 
 
-	def _cosineSimilarity(self, vector1, vector2):
+	@staticmethod
+	def _cosineSimilarity(vector1, vector2):
 		return 1 - np.inner(vector1, vector2) / (norm(vector1) * norm(vector2))
 
 
@@ -73,13 +80,13 @@ class Identifier(SpeakerIdentifier):
 		return " ".join(name)
 
 
-	def identify(self, vector):
+	def identify(self, vector, unknownThreshold=0.4):
 		assert self.dataBase is not None
 
 		scores = {}
 
 		minScore = 1
-		result = None
+		result = "Unknown"
 		for name in self.dataBase:
 			value = self.dataBase.get(name)
 
@@ -89,7 +96,7 @@ class Identifier(SpeakerIdentifier):
 			scores[name] = score
 			# scores[name + "_dist"] = np.sum(np.square(np.subtract(vector, value)), 0)
 
-			result = name if score < minScore else result
+			result = name if (score < minScore and score < unknownThreshold) else result
 			minScore = score if score < minScore else minScore
 
 		return result, scores
@@ -179,23 +186,24 @@ def identifyAuto(embedder:Identifier, usersPath):
 			print("File {}\nTRUE {}\tPREDICTION {}\nscores: {}\n".format(file, name, result, scores))
 
 
+
 def main():
 	usersEnr = {
-		"Anton/Dobryshev": r"D:\data\Speech\Voices_audio\MySets\anton\enr",
-		"Alina": r"D:\data\Speech\Voices_audio\MySets\alina\enr",
-		"Tanya": r"D:\data\Speech\Voices_audio\MySets\tanya\enr",
-		"Ilya": r"D:\data\Speech\Voices_audio\MySets\ilya\enr"
+		"Anton/Drobyshev": r"D:\data\Speech\Voices_audio\MySets\Anton\enr",
+		"Alina/Bazarbaeva": r"D:\data\Speech\Voices_audio\MySets\Alina\enr",
+		"Tanya/Yan": r"D:\data\Speech\Voices_audio\MySets\Tanya\enr",
+		"Ilya/Mirin": r"D:\data\Speech\Voices_audio\MySets\Ilya\enr"
 	}
 
 	usersVer = {
-		"Anton/Drobyshev": r"D:\data\Speech\Voices_audio\MySets\anton\ver",
-		"Alina": r"D:\data\Speech\Voices_audio\MySets\alina\ver",
-		"Tanya": r"D:\data\Speech\Voices_audio\MySets\tanya\ver",
-		"Ilya": r"D:\data\Speech\Voices_audio\MySets\ilya\ver"
+		"Anton/Drobyshev": r"D:\data\Speech\Voices_audio\MySets\Anton\ver",
+		"Alina/Bazarbaeva": r"D:\data\Speech\Voices_audio\MySets\Alina\ver",
+		"Tanya/Yan": r"D:\data\Speech\Voices_audio\MySets\Tanya\ver",
+		"Ilya/Mirin": r"D:\data\Speech\Voices_audio\MySets\Ilya\ver"
 	}
 
 	dataBase = DataBase(
-		filepath=r"./Temp/users_test2.hdf",
+		filepath=r"./Temp/users_test1.hdf",
 		showBase=True
 	)
 
@@ -204,8 +212,11 @@ def main():
 		dataBase=dataBase
 	)
 
-	enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
-	identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+	result, _ = embedder.identifyViaMicrophone()
+	print(result)
+
+	# enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+	# identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
 
 	# enroll(embedder, usersEnr)
 	#

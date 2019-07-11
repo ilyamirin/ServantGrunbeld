@@ -1,13 +1,19 @@
-from scipy.ndimage.morphology import binary_dilation
-
 from pathlib import Path
 from typing import Optional, Union
+
 import numpy as np
-import webrtcvad
 import librosa
 import struct
+import webrtcvad
+
 from scipy.io.wavfile import read as audio_read
-from params_data import *
+from scipy.ndimage.morphology import binary_dilation
+
+try:
+	from .Config import AudioConfig
+except ImportError:
+	from Config import AudioConfig
+
 
 int16_max = (2 ** 15) - 1
 LIBROSA = "librosa"
@@ -21,10 +27,10 @@ def preprocess_file(file, vad=LIBROSA):
 
 	# wav, source_sr = librosa.load(file, sr=None)
 
-	if source_sr is not None and source_sr != sampling_rate:
-		wav = librosa.resample(wav, source_sr, sampling_rate)
+	if source_sr is not None and source_sr != AudioConfig.sampling_rate:
+		wav = librosa.resample(wav, source_sr, AudioConfig.sampling_rate)
 
-	wav = normalize_volume(wav, audio_norm_target_dBFS, increase_only=True)
+	wav = normalize_volume(wav, AudioConfig.audio_norm_target_dBFS, increase_only=True)
 	wav = trim_long_silences(wav, vad)
 
 	wave_slices, mel_slices = compute_partial_slices(len(wav))
@@ -59,11 +65,11 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray],
 		wav = fpath_or_wav
 
 	# Resample the wav if needed
-	if source_sr is not None and source_sr != sampling_rate:
-		wav = librosa.resample(wav, source_sr, sampling_rate)
+	if source_sr is not None and source_sr != AudioConfig.sampling_rate:
+		wav = librosa.resample(wav, source_sr, AudioConfig.sampling_rate)
 
 	# Apply the preprocessing: normalize volume and shorten long silences
-	wav = normalize_volume(wav, audio_norm_target_dBFS, increase_only=True)
+	wav = normalize_volume(wav, AudioConfig.audio_norm_target_dBFS, increase_only=True)
 	wav = trim_long_silences(wav)
 
 	return wav
@@ -76,10 +82,10 @@ def wav_to_mel_spectrogram(wav):
 	"""
 	frames = librosa.feature.melspectrogram(
 		wav,
-		sampling_rate,
-		n_fft=int(sampling_rate * mel_window_length / 1000),
-		hop_length=int(sampling_rate * mel_window_step / 1000),
-		n_mels=mel_n_channels
+		AudioConfig.sampling_rate,
+		n_fft=int(AudioConfig.sampling_rate * AudioConfig.mel_window_length / 1000),
+		hop_length=int(AudioConfig.sampling_rate * AudioConfig.mel_window_step / 1000),
+		n_mels=AudioConfig.mel_n_channels
 	)
 	return frames.astype(np.float32).T
 
@@ -95,7 +101,7 @@ def do_webrtc_vad(wav, samples_per_window):
 	for window_start in range(0, len(wav), samples_per_window):
 		window_end = window_start + samples_per_window
 		voice_flags.append(vad.is_speech(pcm_wave[window_start * 2:window_end * 2],
-		                                 sample_rate=sampling_rate))
+		                                 sample_rate=AudioConfig.sampling_rate))
 	voice_flags = np.array(voice_flags)
 
 
@@ -107,11 +113,11 @@ def do_webrtc_vad(wav, samples_per_window):
 		return ret[width - 1:] / width
 
 
-	audio_mask = moving_average(voice_flags, vad_moving_average_width)
+	audio_mask = moving_average(voice_flags, AudioConfig.vad_moving_average_width)
 	audio_mask = np.round(audio_mask).astype(np.bool)
 
 	# Dilate the voiced regions
-	audio_mask = binary_dilation(audio_mask, np.ones(vad_max_silence_length + 1))
+	audio_mask = binary_dilation(audio_mask, np.ones(AudioConfig.vad_max_silence_length + 1))
 	audio_mask = np.repeat(audio_mask, samples_per_window)
 
 	return wav[audio_mask == True]
@@ -138,7 +144,7 @@ def trim_long_silences(wav, vad=LIBROSA):
 	:return: the same waveform with silences trimmed away (length <= original wav length)
 	"""
 	# Compute the voice detection window size
-	samples_per_window = (vad_window_length * sampling_rate) // 1000
+	samples_per_window = (AudioConfig.vad_window_length * AudioConfig.sampling_rate) // 1000
 
 	# Trim the end of the audio to have a multiple of the window size
 	wav = wav[:len(wav) - (len(wav) % samples_per_window)]
@@ -164,7 +170,7 @@ def normalize_volume(wav, target_dBFS, increase_only=False, decrease_only=False)
 	return wav * (10 ** (dBFS_change / 20))
 
 
-def compute_partial_slices(n_samples, partial_utterance_n_frames=partials_n_frames,
+def compute_partial_slices(n_samples, partial_utterance_n_frames=AudioConfig.partials_n_frames,
                            min_pad_coverage=0.75, overlap=0.5):
 	"""
 	Computes where to split an utterance waveform and its corresponding mel spectrogram to obtain
@@ -193,7 +199,7 @@ def compute_partial_slices(n_samples, partial_utterance_n_frames=partials_n_fram
 	assert 0 <= overlap < 1
 	assert 0 < min_pad_coverage <= 1
 
-	samples_per_frame = int((sampling_rate * mel_window_step / 1000))
+	samples_per_frame = int((AudioConfig.sampling_rate * AudioConfig.mel_window_step / 1000))
 	n_frames = int(np.ceil((n_samples + 1) / samples_per_frame))
 	frame_step = max(int(np.round(partial_utterance_n_frames * (1 - overlap))), 1)
 

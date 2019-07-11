@@ -21,7 +21,7 @@ class DataBase:
 		return self
 
 
-	def __exit__(self, type, val, tb):
+	def __exit__(self, type_, val, tb):
 		del self
 
 
