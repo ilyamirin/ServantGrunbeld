@@ -150,7 +150,7 @@ class MicrophoneRecorder:
 		print("started... ", end="")
 
 		aList = []
-		start_new_thread(function=inputThread, args=(aList,))
+		start_new_thread(inputThread, (aList,))
 		self.recordVoice(stream, record, MANUAL_KEYBOARD, threshold=aList)
 
 		print("stopped")
@@ -239,9 +239,9 @@ def inputThread(aList):
 
 def main():
 	with MicrophoneRecorder() as microphone:
-		microphone.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=15, toFile=True)
-
-	# microphone.recordManual(toFile=True)
+		# microphone.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=10, toFile=True)
+		# microphone.recordAuto(mode=AUTO_SILENCE_LIMIT, threshold=10, toFile=True)
+		microphone.recordManual(toFile=True)
 
 
 if __name__ == "__main__":
