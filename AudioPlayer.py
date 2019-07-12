@@ -54,8 +54,7 @@ class Player:
 			self.initPipe()
 
 		if not opened:
-			tempFile = io.BytesIO(audio)
-			audio = wave.open(tempFile, "rb")
+			audio = wave.open(audio, "rb")
 
 		stream = self.pipe.open(
 			format=self.pipe.get_format_from_width(audio.getsampwidth()),
@@ -82,13 +81,13 @@ def test():
 
 
 def testTandem():
-	from Microphone import MicrophoneRecorder
+	from Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT
 	microphone = MicrophoneRecorder()
 	player = Player()
 
 	print("Please speak")
-	player.playAudio(microphone.recordAuto())
+	player.playAudio(microphone.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=5))
 
 
 if __name__ == "__main__":
-	test()
+	testTandem()
