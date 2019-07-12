@@ -80,6 +80,42 @@ class Identifier(SpeakerIdentifier):
 		return " ".join(name)
 
 
+	def enroll(self, name, vector, overwrite=False):
+		assert self.dataBase is not None
+
+		if not overwrite:
+			vectorOld = self.dataBase.get(name, 0)
+			vector = np.average(np.array((vector, vectorOld)), axis=0)
+
+		self.dataBase.put(name, vector)
+		print("User {} has been enrolled".format(name))
+
+
+	def enrollFromMicrophone(self, name):
+		with self.microphone as micro:
+			audio = micro.recordManual()
+
+		embedding = self._getEmbeddingFromFile(audio)
+
+		name = self._checkIncomingName(name)
+		self.enroll(name, embedding)
+
+
+	def enrollFromFolder(self, name, folder):
+		files = [f for f in os.listdir(folder) if f.lower().endswith(".wav")]
+
+		vector = []
+		for file in files:
+			embeddings = self._getEmbeddingFromFile(os.path.join(folder, file))
+
+			vector.append(embeddings)
+
+		vector = np.average(vector, axis=0)
+
+		name = self._checkIncomingName(name)
+		self.enroll(name, vector)
+
+
 	def identify(self, vector, unknownThreshold=0.4):
 		assert self.dataBase is not None
 
@@ -117,42 +153,6 @@ class Identifier(SpeakerIdentifier):
 		results = self._checkOutgouingName(results)
 
 		return results, scores
-
-
-	def enroll(self, name, vector, overwrite=False):
-		assert self.dataBase is not None
-
-		if not overwrite:
-			vectorOld = self.dataBase.get(name, 0)
-			vector = np.average(np.array((vector, vectorOld)), axis=0)
-
-		self.dataBase.put(name, vector)
-		print("User {} has been enrolled".format(name))
-
-
-	def enrollFromMicrophone(self, name):
-		with self.microphone as micro:
-			audio = micro.recordManual()
-
-		embedding = self._getEmbeddingFromFile(audio)
-
-		name = self._checkIncomingName(name)
-		self.enroll(name, embedding)
-
-
-	def enrollFromFolder(self, name, folder):
-		files = [f for f in os.listdir(folder) if f.lower().endswith(".wav")]
-
-		vector = []
-		for file in files:
-			embeddings = self._getEmbeddingFromFile(os.path.join(folder, file))
-
-			vector.append(embeddings)
-
-		vector = np.average(vector, axis=0)
-
-		name = self._checkIncomingName(name)
-		self.enroll(name, vector)
 
 
 def enroll(embedder:Identifier, userDict):
@@ -203,7 +203,7 @@ def main():
 	}
 
 	dataBase = DataBase(
-		filepath=r"./Temp/users_test1.hdf",
+		filepath=r"./Temp/users.hdf",
 		showBase=True
 	)
 
@@ -212,11 +212,11 @@ def main():
 		dataBase=dataBase
 	)
 
-	result, _ = embedder.identifyViaMicrophone()
-	print(result)
-
 	# enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
 	# identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+
+	result, _ = embedder.identifyViaMicrophone()
+	print(result)
 
 	# enroll(embedder, usersEnr)
 	#

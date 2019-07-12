@@ -13,6 +13,7 @@ class DataBase:
 		if showBase:
 			self.base = self._showBase()
 
+		self.sessionBase = {}
 		self.locked = locked
 
 

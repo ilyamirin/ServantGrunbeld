@@ -105,10 +105,10 @@ class AzureRecognizer(Recognizer):
 
 
 	def processMicrophone(self):
-		self.microphone.initPipe()
-		record = self.microphone.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=10)
+		with self.microphone as micro:
+			record = micro.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=10)
 
-		result = self.processAudio(record)
+		result = self.processAudio(record.read())
 
 		return result
 
