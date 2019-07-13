@@ -10,7 +10,7 @@ online2-tcp-nnet3-decode-faster \
       --frame-subsampling-factor=2 --frames-per-chunk=51 \
       --acoustic-scale=1.0 --beam=12.0 --lattice-beam=6.0 --max-active=10000 \
       --config=$CONFIG_ROOT/exp/tdnn/conf/online.conf $1 $2 $3 $4 $5 $6 $7 $8 $9\
-      $CONFIG_ROOT/exp/tdnn/final.mdl $CONFIG_ROOT/exp/tdnn/graph/HCLG.fst $CONFIG_ROOT/exp/tdnn/graph/words.txt #|
+      $CONFIG_ROOT/exp/tdnn/final.mdl $CONFIG_ROOT/exp/tdnn/graph/HCLG.fst $CONFIG_ROOT/exp/tdnn/graph/words.txt & echo $! #|
     # lattice-lmrescore --lm-scale=-1.0 ark:- 'fstproject --project_output=true data/lang_test_rescore/G.fst |' ark:- |
     # lattice-lmrescore-const-arpa ark:- data/lang_test_rescore/G.carpa ark:- |
     # lattice-align-words data/lang_test_rescore/phones/word_boundary.int exp/tdnn/final.mdl ark:- ark:- |

@@ -1,8 +1,8 @@
 try:
-    from .Config import KaldiConfig
+    from .Config import KaldiConfig, AimlConfig
     from .RecognitionModule import Recognizer
 except ImportError:
-    from Config import KaldiConfig
+    from Config import KaldiConfig, AimlConfig
     from RecognitionModule import Recognizer
 
 from Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT, AUTO_SILENCE_LIMIT
@@ -10,38 +10,59 @@ import socket
 import sys
 import subprocess
 import pyaudio
-import asyncio
 from time import sleep
+import wave
+import json
 
 
 class KaldiOnlineRecognizer(Recognizer):
     def __init__(self, language="ru-RU"):
         super().__init__(language)
-        self.handleIntermediate = lambda *args, **kwargs: None
-        self.handleFinal = lambda *args, **kwargs: None
+        self.handle_intermediate = []
+        self.handle_final = []
         self.kaldi_socket = None
         self.connected = False
+        self.record = []
 
-    def start(self, script_name="tcp-decode.sh", timeout=10):
-        """Запуск ехешника со ВСЕМИ параметрами сейчас захардкожен в скрипте"""
-        res = subprocess.call(
-            f"sh {script_name} --port-num={KaldiConfig.port} --read-timeout=-1 &",
-            stdout=sys.stdout, stderr=sys.stderr, shell=True)
-        if res != 0:
-            raise RuntimeError(f"Не удалось запустить распознаватель. Код ошибки: {res}")
+    def start(self, script_name="tcp-decode.sh", timeout=1, attempts=3, timeout_increment=1):
+        """Запуск ехешника сейчас захардкожен в скрипте"""
+
         self.kaldi_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.kaldi_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        timedelta = 0.1
-        while self.kaldi_socket.connect_ex((KaldiConfig.host, KaldiConfig.port)) != 0 and timeout > 0:
-            timeout -= timedelta
-            sleep(timedelta)
-        self.connected = True
-        data = []
+
+        self.connected = False
+        while not self.connected and attempts > 0:
+            attempts -= 1
+            timeout_, timedelta = timeout, 0.1
+            timeout += timeout_increment
+            self.connected = self.kaldi_socket.connect_ex((KaldiConfig.host, KaldiConfig.port)) == 0
+            while not self.connected and timeout_ > 0:
+                timeout_ -= timedelta
+                sleep(timedelta)
+                self.connected = self.kaldi_socket.connect_ex((KaldiConfig.host, KaldiConfig.port)) == 0
+            if not self.connected:
+                subprocess.call(
+                    f"sh {script_name} --port-num={KaldiConfig.port} --read-timeout=-1 &",
+                    stdout=sys.stdout, stderr=sys.stderr, shell=True
+                )
+        if not self.connected:
+            raise RuntimeError("Не удалось запустить распознаватель")
+        print("Подключено. Говорите...", flush=True)
+
+        sentence = []
+        self.record = []
         while True:
-            data.append(self.kaldi_socket.recv(1))
-            if data[-1] == b'\r' or data[-1] == b'\n':
-                self.handleIntermediate((b"".join(data)).decode("utf-8"))
-                data = []
+            data = self.kaldi_socket.recv(1)
+            sentence.append(data)
+            if sentence and sentence[-1] == b'\r':
+                for func in self.handle_intermediate:
+                    func(b"".join(sentence).decode("utf-8"))
+                sentence = []
+            if not data or sentence and sentence[-1] == b'\n':
+                self.stop()
+                for func in self.handle_final:
+                    func(b"".join(sentence).decode("utf-8"))
+                break
 
     def stop(self):
         pass
@@ -62,31 +83,28 @@ class KaldiOnlineRecognizer(Recognizer):
         # src/online2bin/online2-tcp-nnet3-decode-faster
         # печатает \r в конце каждой lattice
         # \n в конце feature pipeline
+        self.record.extend(data)
         """Скормить огрызок распознавалке"""
         if self.kaldi_socket is not None and self.connected:
             self.kaldi_socket.send(data)
 
     def registerIntermediateRecognitionHandler(self, callback):
-        self.handleIntermediate = callback
+        self.handle_intermediate.append(callback)
 
     def registerFinalRecognitionHandler(self, callback):
-        self.handleFinal = callback
+        self.handle_final.append(callback)
 
 
 class PyAudioHelper:
-    def __init__(self, recognizer, microphone):
+    def __init__(self, recognizer):
         self.recognizer = recognizer
-        self.mic = microphone
         self.session_running = False
-        self.mic_stream = microphone.open(
-            format=pyaudio.paInt16,
-            channels=1,
+        self.mic = MicrophoneRecorder(
+            chunkSize=KaldiConfig.chunk_length,
             rate=KaldiConfig.samp_freq,
-            input=True,
-            output=True,
-            frames_per_buffer=KaldiConfig.chunk_length,
-            stream_callback=self.streamCallback
         )
+        self.aiml_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.aiml_connected = self.aiml_socket.connect_ex((AimlConfig.HOST, AimlConfig.PORT)) == 0
 
     def streamCallback(self, in_data, frame_count, time_info, status):
         self.recognizer.processChunk(in_data)
@@ -96,33 +114,59 @@ class PyAudioHelper:
         print(text)
         sys.stdout.flush()
 
-
     def handleFinal(self, text):
         print(text, '\n')
         sys.stdout.flush()
+        file = wave.open("record.wav", 'wb')
+        file.setnchannels(1)
+        file.setsampwidth(self.mic.getSampleSize())
+        file.setframerate(KaldiConfig.samp_freq)
+        file.writeframes(bytearray(self.recognizer.record))
+        file.close()
+        answer = self.talk(text)
+        print(f"-- {answer}")
+
+    def talk(self, question, userid='anon'):
+        if not self.aiml_connected:
+            print("AIML server not found", flush=True)
+            return None
+        query = {
+            "userid": userid,
+            "question": question
+        }
+        self.aiml_socket.send(json.dumps(query).encode())
+        answer = self.aiml_socket.recv(AimlConfig.TCP_BUFFER_LEN).decode('utf-8')
+        data = json.loads(answer)
+        print(data, flush=True)
+        return data['answer']['text']
 
     def startStream(self):
-        print("pa_helper: stream started")
         self.session_running = True
-        self.mic_stream.start_stream()
+        # start_stream микрофона запускает асинхронное прослушивание
+        self.mic.startStream(callback=self.streamCallback)
+        # recognizer.start запускает блокирующий цикл.
+        # запуск самой распознавалки занимает время, к тому же занимает целый порт,
+        # поэтому каждый запуск/остановка распознавалки должна соответствовать сессии целиком.
+        # внутри одной сессии контекст обнуляется между предложениями (опр. продолжительными паузами)
         self.recognizer.start()
 
     def stopStream(self):
         self.session_running = False
         self.recognizer.stop()
-        self.mic_stream.stop_stream()
-        self.mic_stream.close()
-        print("pa_helper: stream finished")
+        self.mic.stopStream()
 
 
 def main():
     recognizer = KaldiOnlineRecognizer()
-    microphone = pyaudio.PyAudio()
-    pyh = PyAudioHelper(recognizer, microphone)
+    pyh = PyAudioHelper(recognizer)
     recognizer.registerIntermediateRecognitionHandler(pyh.handleIntermediate)
     recognizer.registerFinalRecognitionHandler(pyh.handleFinal)
-    pyh.startStream()
-    pyh.stopStream()
+    while True:
+        pyh.startStream()
+        pyh.stopStream()
+        print('Нажмите Enter для продолжения, "." + Enter для завершения')
+        if input().startswith('.'):
+            break
 
 
 __all__ = [KaldiOnlineRecognizer]

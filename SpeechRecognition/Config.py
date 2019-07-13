@@ -363,3 +363,9 @@ class KaldiConfig:
 	word_determinize = "true"
 
 	chunk_length = int(samp_freq * chunk_length_sec)
+
+
+class AimlConfig:
+	HOST = "127.0.0.1"
+	PORT = 8080
+	TCP_BUFFER_LEN = 16384
