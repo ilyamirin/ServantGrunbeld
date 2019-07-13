@@ -30,6 +30,7 @@ class MicrophoneRecorder:
 
 		self.pipe = None
 		self.pipeIsOpened = False
+		self.mic_stream = None
 
 		self.name = name
 
@@ -230,6 +231,45 @@ class MicrophoneRecorder:
 
 		with open(fullPath, "wb") as wf:
 			wf.write(data.read())
+
+
+	def startStream(self, callback=None, channels=1, input=True, output=False):
+		"""Неблокирующая функция. Запускает асинхронную запись микрофона.
+		Каждые self.chunkSize вызывается streamCallback с сигнатурой
+			callback(
+				in_data: recorded data if input=True; else None,
+				frame_count: number of frames,
+				time_info: dictionary,
+				status_flags: PaCallbackFlags
+			) -> tuple(
+				out_data: a byte array whose length should be
+					the (frame_count * channels * bytes-per-channel) if output=True or None if output=False,
+				flag: must be either pyaudio.paContinue, paComplete or paAbort
+			)
+		"""
+		if not self.pipeIsOpened:
+			self.initPipe()
+		self.mic_stream = self.pipe.open(
+			format=self.format,
+			channels=channels,
+			rate=self.rate,
+			input=input,
+			output=output,
+			frames_per_buffer=self.chunkSize,
+			stream_callback=callback
+		)
+		self.mic_stream.start_stream()
+
+
+	def getSampleSize(self):
+		if not self.pipeIsOpened:
+			self.initPipe()
+		return self.pipe.get_sample_size(self.format)
+
+
+	def stopStream(self):
+		self.mic_stream.stop_stream()
+		self.mic_stream.close()
 
 
 def inputThread(aList):
