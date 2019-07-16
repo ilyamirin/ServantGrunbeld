@@ -13,6 +13,7 @@ import pyaudio
 from time import sleep
 import wave
 import json
+import datetime
 
 
 class KaldiOnlineRecognizer(Recognizer):
@@ -47,7 +48,7 @@ class KaldiOnlineRecognizer(Recognizer):
                 )
         if not self.connected:
             raise RuntimeError("Не удалось запустить распознаватель")
-        print("Подключено. Говорите...", flush=True)
+        print("Говорите...", flush=True)
 
         sentence = []
         self.record = []
@@ -103,32 +104,42 @@ class PyAudioHelper:
             chunkSize=KaldiConfig.chunk_length,
             rate=KaldiConfig.samp_freq,
         )
-        self.aiml_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.aiml_connected = self.aiml_socket.connect_ex((AimlConfig.HOST, AimlConfig.PORT)) == 0
+        self.aiml_socket = None  # socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.aiml_connected = False
 
     def streamCallback(self, in_data, frame_count, time_info, status):
         self.recognizer.processChunk(in_data)
         return in_data, pyaudio.paContinue if self.session_running else pyaudio.paComplete
 
     def handleIntermediate(self, text):
+        if text is None:
+            return
+        text = text.strip()
+        if text == "":
+            return
         print(text)
         sys.stdout.flush()
 
     def handleFinal(self, text):
-        print(text, '\n')
+        if text is None:
+            return
+        text = text.strip()
+        if text == "":
+            return
+        print(f"— {text}")
         sys.stdout.flush()
-        file = wave.open("record.wav", 'wb')
+        file = wave.open(f"./records/record{datetime.datetime.now()}.wav", 'wb')
         file.setnchannels(1)
         file.setsampwidth(self.mic.getSampleSize())
         file.setframerate(KaldiConfig.samp_freq)
         file.writeframes(bytearray(self.recognizer.record))
         file.close()
         answer = self.talk(text)
-        print(f"-- {answer}")
+        print(f"— {answer.strip() if answer else '...'}\n")
 
     def talk(self, question, userid='anon'):
-        if not self.aiml_connected:
-            print("AIML server not found", flush=True)
+        if not self.aiml_connected and not self.connectToAiml():
+            print("AIML server not found", flush=True, file=sys.stderr)
             return None
         query = {
             "userid": userid,
@@ -137,8 +148,7 @@ class PyAudioHelper:
         self.aiml_socket.send(json.dumps(query).encode())
         answer = self.aiml_socket.recv(AimlConfig.TCP_BUFFER_LEN).decode('utf-8')
         data = json.loads(answer)
-        print(data, flush=True)
-        return data['answer']['text']
+        return data['answer']['text'] if data['result'] == "OK" else None
 
     def startStream(self):
         self.session_running = True
@@ -154,6 +164,29 @@ class PyAudioHelper:
         self.session_running = False
         self.recognizer.stop()
         self.mic.stopStream()
+        if self.aiml_connected:
+            self.aiml_connected = False
+            self.aiml_socket.close()
+
+    def connectToAiml(self, script_name="${HOME}/projects/NosferatuZodd/scripts/xnix/NosferatuZodd-tcp.sh",
+                      timeout=1, attempts=3, timeout_increment=1):
+        self.aiml_connected = False
+        self.aiml_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        while not self.aiml_connected and attempts > 0:
+            attempts -= 1
+            timeout_, timedelta = timeout, 0.1
+            timeout += timeout_increment
+            self.aiml_connected = self.aiml_socket.connect_ex((AimlConfig.HOST, AimlConfig.PORT)) == 0
+            while not self.aiml_connected and timeout_ > 0:
+                timeout_ -= timedelta
+                sleep(timedelta)
+                self.aiml_connected = self.aiml_socket.connect_ex((AimlConfig.HOST, AimlConfig.PORT)) == 0
+            # if not self.aiml_connected:
+            #     subprocess.call(
+            #         f"sh {script_name} &",
+            #         stdout=sys.stdout, stderr=sys.stderr, shell=True
+            #     )
+        return self.aiml_connected
 
 
 def main():
@@ -164,9 +197,9 @@ def main():
     while True:
         pyh.startStream()
         pyh.stopStream()
-        print('Нажмите Enter для продолжения, "." + Enter для завершения')
-        if input().startswith('.'):
-            break
+        # print('Нажмите Enter для продолжения, "." + Enter для завершения')
+        # if input().startswith('.'):
+        #     break
 
 
 __all__ = [KaldiOnlineRecognizer]
