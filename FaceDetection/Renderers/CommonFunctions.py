@@ -1,4 +1,4 @@
-from Renderers.RenderersConfig import Position
+from .RenderersConfig import Position
 
 
 def _getLineThickness(size):

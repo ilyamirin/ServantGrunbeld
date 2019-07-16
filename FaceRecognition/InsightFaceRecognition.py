@@ -9,14 +9,16 @@ import numpy as np
 import mxnet as mx
 import random
 import cv2
-import sklearn
 
+from sklearn.preprocessing import normalize
+from multiprocessing import Process, Queue
+from _thread import start_new_thread
 from numpy.linalg import norm
 from time import time
 
 from FaceDetection.RetinaFaceDetector import RetinaFace
 from FaceDetection.Renderers import OpenCVRenderer as renderer
-from FaceRecognition.Preprocessing import preprocess
+from FaceRecognition.Preprocessing import preprocessFace
 from DataBase import DataBase
 
 
@@ -25,34 +27,51 @@ class TooManyFaces(Exception):
 
 
 class FaceRecognizer:
-	def __init__(self, prefix, epoch, database:DataBase, detector:RetinaFace, ctxID=0):
+	def __init__(self, prefix, epoch, dataBase:DataBase, detector:RetinaFace, ctxID=0):
 		self.net = self._initEmbedder(prefix, epoch, ctxID)
 
-		self.dataBase = database
+		self.dataBase = dataBase
 		self.detector = detector
 
 
-	def _initEmbedder(self, prefix, epoch, ctx):
-		return 0
+	def _initEmbedder(self, prefix, epoch, ctx, shape=(112, 112), layer="fc1"):
+		if ctx >= 0:
+			ctx = mx.gpu(ctx)
+		else:
+			ctx = mx.cpu()
+
+		sym, arg_params, aux_params = mx.model.load_checkpoint(prefix, epoch)
+		all_layers = sym.get_internals()
+		sym = all_layers[layer + '_output']
+
+		model = mx.mod.Module(symbol=sym, context=ctx, label_names=None)
+
+		model.bind(data_shapes=[('data', (1, 3) + shape)])
+		model.set_params(arg_params, aux_params)
+
+		return model
 
 
 	def _getEmbedding(self, face):
-		embeddings = self.net.forward(face).cpu().data.numpy()
-
-		embedding = np.average(embeddings, axis=0)
+		input_blob = np.expand_dims(face, axis=0)
+		data = mx.nd.array(input_blob)
+		db = mx.io.DataBatch(data=(data,))
+		self.net.forward(db, is_train=False)
+		embedding = self.net.get_outputs()[0].asnumpy()
+		embedding = normalize(embedding).flatten()
 
 		return embedding
 
 
-	def _processImageTensor(self, tensor):
-		faces, coords = self.detectFaces(tensor)
+	def _processImageTensor(self, tensor, enrollment=False):
+		faces, boxes, landmarks = self.detectFaces(tensor)
 
-		if len(faces) > 1:
+		if enrollment and len(faces) > 1:
 			raise TooManyFaces
-		else:
-			faces = faces[0]
 
-		return self._getEmbedding(faces), faces, coords
+		embeddings = [self._getEmbedding(face) for face in faces]
+
+		return embeddings, boxes, landmarks
 
 
 	@staticmethod
@@ -79,11 +98,16 @@ class FaceRecognizer:
 
 
 	def detectFaces(self, image):
-		results = self.detector.process_image(image, resToDict=True)
+		results = self.detector.process_image(image)
 
-		faces = preprocess(image, results)
+		boxes = results[0].astype(np.int32)
+		landmarks = results[-1]
 
-		return faces, results
+		faces = []
+		for idx in range(len(boxes)):
+			faces.append(preprocessFace(image, boxes[idx], landmarks[idx]))
+
+		return faces, boxes, landmarks
 
 
 	def enroll(self, name, vector):
@@ -94,40 +118,33 @@ class FaceRecognizer:
 
 
 	def enrollFromImageTensor(self, image, name):
-		embedding, faces, coords = self._processImageTensor(image)
+		embeddings, boxes, landmarks = self._processImageTensor(image, enrollment=True)
 
 		name = self._checkIncomingName(name)
-		self.enroll(name, embedding)
+		self.enroll(name, embeddings)
 
-		return faces, coords
+		return boxes, landmarks
 
 
 	def enrollFromImageFile(self, filepath, name, readMode=1):
-		name = filepath if name is None else name
-
 		image = cv2.imread(filepath, readMode)
 		self.enrollFromImageTensor(image, name)
 
 
 	def enrollFromVideoFile(self, filepath, name, show=False):
-		cap = cv2.VideoCapture(filepath)
-
-		success, frame = cap.read()
-		assert success
+		videoQueue = Queue()
+		start_new_thread(videoStream, (filepath, videoQueue))
 
 		fpsList = []
-		fps = 0
-		while cap.isOpened():
-			ret, frame = cap.read()
-			if not ret:
-				break
+		while True:
 			t1 = time()
 
-			_, attributes = self.enrollFromImageTensor(frame, name)
-			boxes, texts = attributes
+			frame = videoQueue.get()
+
+			boxes, landmarks = self.enrollFromImageTensor(frame, name)
 
 			if show:
-				frame = renderer.drawBoxes(frame, boxes, text=texts, adaptiveToImage=True, occurrence="outer",
+				frame = renderer.drawBoxes(frame, boxes, text=name, adaptiveToImage=True, occurrence="outer",
 				                           fillTextBox=False)
 
 				cv2.namedWindow("Enrollment", cv2.WINDOW_NORMAL)
@@ -141,48 +158,38 @@ class FaceRecognizer:
 				fps = 10 // sum(fpsList)
 				fpsList = []
 
-			print("\rWebcam stream FPS {}".format(fps), end="")
+				print("\rVideo stream FPS {}".format(fps), end="")
 
 		print("User {} has been enrolled".format(self._checkIncomingName(name)))
 
 
 	def enrollFromCamera(self, webcamID, name, show=False):
-		captureSize = (640, 480)
-
-		stream = cv2.VideoCapture(webcamID)
-
-		stream.set(cv2.CAP_PROP_FRAME_WIDTH, captureSize[0])
-		stream.set(cv2.CAP_PROP_FRAME_HEIGHT, captureSize[1])
+		cameraQueue = Queue()
+		start_new_thread(webCamera, (webcamID, cameraQueue))
 
 		fpsList = []
-		fps = 0
 		while True:
 			t1 = time()
-			grabbed, frame = stream.read()
-			if not grabbed:
-				break
+			frame = cameraQueue.get()
 
-			_, attributes = self.enrollFromImageTensor(frame, name)
-			boxes, texts = attributes
+			boxes, landmarks = self.enrollFromImageTensor(frame, name)
 
 			if show:
-				frame = renderer.drawBoxes(frame, boxes, text=texts, adaptiveToImage=True, occurrence="outer",
+				frame = renderer.drawBoxes(frame, boxes, text=name, adaptiveToImage=True, occurrence="outer",
 				                           fillTextBox=False)
 
 				cv2.namedWindow("Enrollment", cv2.WINDOW_NORMAL)
 				cv2.imshow("Enrollment", frame)
+
+			if cv2.waitKey(1) & 0xFF == ord('q'):
+				break
 
 			fpsList.append(time() - t1)
 			if len(fpsList) == 10:
 				fps = 10 // sum(fpsList)
 				fpsList = []
 
-			assert captureSize == frame.shape[:-1][::-1]
-
-			print("\rWebcam stream FPS {}".format(fps), end="")
-
-			if cv2.waitKey(1) & 0xFF == ord('q'):
-				break
+				print("\rWebcam stream FPS {}".format(fps), end="")
 
 		print("User {} has been enrolled".format(self._checkIncomingName(name)))
 
@@ -193,9 +200,9 @@ class FaceRecognizer:
 		vector = []
 		for file in files:
 			image = cv2.imread(os.path.join(folder, file), readMode)
-			embedding, _, _ = self._processImageTensor(image)
+			embeddings, _, _ = self._processImageTensor(image)
 
-			vector.append(embedding)
+			vector.append(embeddings)
 
 		vector = np.average(vector, axis=0)
 
@@ -225,16 +232,68 @@ class FaceRecognizer:
 		return result, scores
 
 
-	def identifyViaCamera(self):
-		pass
+	def identifyViaCamera(self, webcamID):
+		cameraQueue = Queue()
+		start_new_thread(webCamera, (webcamID, cameraQueue))
+		captureSize = (640, 480)
 
+		fpsList = []
+		while True:
+			t1 = time()
+			try:
+				frame = cameraQueue.get_nowait()
 
-	def identifyViaImageFile(self, filepath):
-		pass
+				embeddings, boxes, landmarks = self._processImageTensor(frame)
+
+				users = []
+				for embed in embeddings:
+					result, scores = self.identify(embed)
+					users.append(result)
+
+				frame = renderer.drawBoxes(frame, boxes, text=users, adaptiveToImage=True, occurrence="outer",
+				                           fillTextBox=False)
+
+				cv2.namedWindow("Enrollment", cv2.WINDOW_NORMAL)
+				cv2.imshow("Enrollment", frame)
+
+				if cv2.waitKey(1) & 0xFF == ord('q'):
+					break
+			except:
+				pass
 
 
 	def identifyViaVideoFile(self, filepath):
-		pass
+		videoQueue = Queue()
+		start_new_thread(videoStream, (filepath, videoQueue))
+
+		fpsList = []
+		while True:
+			t1 = time()
+			frame = videoQueue.get()
+
+			embeddings, boxes, landmarks = self._processImageTensor(frame)
+			result, scores = self.identify(embeddings)
+
+		# return result, scores
+
+
+	def identifyViaImageFile(self, filepath, readMode=1):
+		image = cv2.imread(filepath, readMode)
+
+		embeddings, boxes, landmarks = self._processImageTensor(image)
+
+		users = []
+		for idx, embed in enumerate(embeddings):
+			result, scores = self.identify(embed)
+
+			users.append({
+				"name": result,
+				"scores": scores,
+				"coords": boxes[idx],
+				"keypoints": landmarks[idx]
+			})
+
+		return users
 
 
 def initVideoRecroder(filepath, shape, savepath=None):
@@ -249,101 +308,90 @@ def initVideoRecroder(filepath, shape, savepath=None):
 	return recorder
 
 
-def webCamera(id, queue):
-	pass
+def webCamera(webcamID, queue:Queue):
+	captureSize = (640, 480)
+
+	stream = cv2.VideoCapture(webcamID)
+
+	stream.set(cv2.CAP_PROP_FRAME_WIDTH, captureSize[0])
+	stream.set(cv2.CAP_PROP_FRAME_HEIGHT, captureSize[1])
+
+	while True:
+		grabbed, frame = stream.read()
+		if not grabbed:
+			break
+
+		queue.put(frame)
+
+		assert captureSize == frame.shape[:-1][::-1]
+
+		if cv2.waitKey(1) & 0xFF == ord('q'):
+			break
 
 
-def videoStream(queue):
-	pass
+def videoStream(filepath, queue):
+	cap = cv2.VideoCapture(filepath)
+
+	success, frame = cap.read()
+	assert success
+
+	while cap.isOpened():
+		ret, frame = cap.read()
+		if not ret:
+			break
+
+		queue.put(frame)
+
+		if cv2.waitKey(1) & 0xFF == ord('q'):
+			break
 
 
-def do_flip(data):
-	for idx in range(data.shape[0]):
-		data[idx, :, :] = np.fliplr(data[idx, :, :])
+def enroll(recognizer:FaceRecognizer, users):
+	for name, folder in users.items():
+		recognizer.enrollFromFolder(folder, name)
 
 
-def get_model(ctx, image_size, model_str, layer):
-	_vec = model_str.split(',')
-	assert len(_vec) == 2
-	prefix = _vec[0]
-	epoch = int(_vec[1])
-	print('loading', prefix, epoch)
-	sym, arg_params, aux_params = mx.model.load_checkpoint(prefix, epoch)
-	all_layers = sym.get_internals()
-	sym = all_layers[layer + '_output']
-	model = mx.mod.Module(symbol=sym, context=ctx, label_names=None)
-	# model.bind(data_shapes=[('data', (args.batch_size, 3, image_size[0], image_size[1]))], label_shapes=[('softmax_label', (args.batch_size,))])
-	model.bind(data_shapes=[('data', (1, 3, image_size[0], image_size[1]))])
-	model.set_params(arg_params, aux_params)
-	return model
+def identify(recognizer:FaceRecognizer, users):
+	for name, folder in users.items():
+		for file in os.listdir(folder):
+			users = recognizer.identifyViaImageFile(os.path.join(folder, file))
+			for usr in users:
+				print("File {}\nTRUE {}\tPREDICTION {}\nscores: {}\n".format(file, name,
+				                                                             usr.get("name"), usr.get("scores")))
 
 
-class FaceModel:
-	def __init__(self, args):
-		self.args = args
-		ctx = mx.gpu(args.gpu)
-		_vec = args.image_size.split(',')
-		assert len(_vec) == 2
-		image_size = (int(_vec[0]), int(_vec[1]))
-		self.model = None
-		self.ga_model = None
-		if len(args.model) > 0:
-			self.model = get_model(ctx, image_size, args.model, 'fc1')
-		if len(args.ga_model) > 0:
-			self.ga_model = get_model(ctx, image_size, args.ga_model, 'fc1')
+def main():
+	usersEnroll = {
+		"Anton": r"D:\data\Faces\MySets\Anton\enr",
+		"Alina": r"D:\data\Faces\MySets\Alina\enr",
+		"Tanya": r"D:\data\Faces\MySets\Tanya\enr"
+	}
 
-		self.threshold = args.threshold
-		self.det_minsize = 50
-		self.det_threshold = [0.6, 0.7, 0.8]
-		# self.det_factor = 0.9
-		self.image_size = image_size
-		mtcnn_path = os.path.join(os.path.dirname(__file__), 'mtcnn-model')
-		if args.det == 0:
-			detector = MtcnnDetector(model_folder=mtcnn_path, ctx=ctx, num_worker=1, accurate_landmark=True,
-			                         threshold=self.det_threshold)
-		else:
-			detector = MtcnnDetector(model_folder=mtcnn_path, ctx=ctx, num_worker=1, accurate_landmark=True,
-			                         threshold=[0.0, 0.0, 0.2])
-		self.detector = detector
+	usersIdentify = {
+		"Anton": r"D:\data\Faces\MySets\Anton\ver",
+		"Alina": r"D:\data\Faces\MySets\Alina\ver",
+		"Tanya": r"D:\data\Faces\MySets\Tanya\ver"
+	}
 
+	dataBase = DataBase(
+		filepath="./Temp/users_face.hdf"
+	)
 
-	def get_input(self, face_img):
-		ret = self.detector.detect_face(face_img, det_type=self.args.det)
-		if ret is None:
-			return None
-		bbox, points = ret
-		if bbox.shape[0] == 0:
-			return None
-		bbox = bbox[0, 0:4]
-		points = points[0, :].reshape((2, 5)).T
-		# print(bbox)
-		# print(points)
-		nimg = face_preprocess.preprocess(face_img, bbox, points, image_size='112,112')
-		nimg = cv2.cvtColor(nimg, cv2.COLOR_BGR2RGB)
-		aligned = np.transpose(nimg, (2, 0, 1))
-		return aligned
+	detector = RetinaFace(
+		prefix=r"D:\git_projects\FEFU\PipeleneDraft\FaceDetection\Data\R50",
+		epoch=0
+	)
 
+	recognizer = FaceRecognizer(
+		prefix=r"D:\git_projects\FEFU\PipeleneDraft\FaceRecognition\Data\model",
+		epoch=0,
+		dataBase=dataBase,
+		detector=detector
+	)
 
-	def get_feature(self, aligned):
-		input_blob = np.expand_dims(aligned, axis=0)
-		data = mx.nd.array(input_blob)
-		db = mx.io.DataBatch(data=(data,))
-		self.model.forward(db, is_train=False)
-		embedding = self.model.get_outputs()[0].asnumpy()
-		embedding = sklearn.preprocessing.normalize(embedding).flatten()
-		return embedding
+	# enroll(recognizer, usersEnroll)
+	# identify(recognizer, usersIdentify)
+	recognizer.identifyViaCamera(0)
 
-
-	def get_ga(self, aligned):
-		input_blob = np.expand_dims(aligned, axis=0)
-		data = mx.nd.array(input_blob)
-		db = mx.io.DataBatch(data=(data,))
-		self.ga_model.forward(db, is_train=False)
-		ret = self.ga_model.get_outputs()[0].asnumpy()
-		g = ret[:, 0:2].flatten()
-		gender = np.argmax(g)
-		a = ret[:, 2:202].reshape((100, 2))
-		a = np.argmax(a, axis=1)
-		age = int(sum(a))
-
-		return gender, age
+if __name__ == "__main__":
+	main()
