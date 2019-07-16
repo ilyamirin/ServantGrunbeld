@@ -80,12 +80,8 @@ class Identifier(SpeakerIdentifier):
 		return " ".join(name)
 
 
-	def enroll(self, name, vector, overwrite=False):
+	def enroll(self, name, vector):
 		assert self.dataBase is not None
-
-		if not overwrite:
-			vectorOld = self.dataBase.get(name, 0)
-			vector = np.average(np.array((vector, vectorOld)), axis=0)
 
 		self.dataBase.put(name, vector)
 		print("User {} has been enrolled".format(name))
@@ -189,21 +185,21 @@ def identifyAuto(embedder:Identifier, usersPath):
 
 def main():
 	usersEnr = {
-		"Anton/Drobyshev": r"D:\data\Speech\Voices_audio\MySets\Anton\enr",
-		"Alina/Bazarbaeva": r"D:\data\Speech\Voices_audio\MySets\Alina\enr",
-		"Tanya/Yan": r"D:\data\Speech\Voices_audio\MySets\Tanya\enr",
-		"Ilya/Mirin": r"D:\data\Speech\Voices_audio\MySets\Ilya\enr"
+		"Anton/Drobyshev": r"D:\data\Speech\Voices_audio\MySets\Anton_Drobyshev\enr",
+		"Alina/Bazarbaeva": r"D:\data\Speech\Voices_audio\MySets\Alina_Bazarbaeva\enr",
+		"Tanya/Yan": r"D:\data\Speech\Voices_audio\MySets\Tanya_Ian\enr",
+		"Ilya/Mirin": r"D:\data\Speech\Voices_audio\MySets\Ilya_Mirin\enr"
 	}
 
 	usersVer = {
-		"Anton/Drobyshev": r"D:\data\Speech\Voices_audio\MySets\Anton\ver",
-		"Alina/Bazarbaeva": r"D:\data\Speech\Voices_audio\MySets\Alina\ver",
-		"Tanya/Yan": r"D:\data\Speech\Voices_audio\MySets\Tanya\ver",
-		"Ilya/Mirin": r"D:\data\Speech\Voices_audio\MySets\Ilya\ver"
+		"Anton/Drobyshev": r"D:\data\Speech\Voices_audio\MySets\Anton_Drobyshev\ver",
+		"Alina/Bazarbaeva": r"D:\data\Speech\Voices_audio\MySets\Alina_Bazarbaeva\ver",
+		"Tanya/Yan": r"D:\data\Speech\Voices_audio\MySets\Tanya_Ian\ver",
+		"Ilya/Mirin": r"D:\data\Speech\Voices_audio\MySets\Ilya_Mirin\ver"
 	}
 
 	dataBase = DataBase(
-		filepath=r"./Temp/users.hdf",
+		filepath=r"./Temp/users_new_base.hdf",
 		showBase=True
 	)
 
@@ -212,11 +208,11 @@ def main():
 		dataBase=dataBase
 	)
 
-	# enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
-	# identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+	enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+	identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
 
-	result, _ = embedder.identifyViaMicrophone()
-	print(result)
+	# result, _ = embedder.identifyViaMicrophone()
+	# print(result)
 
 	# enroll(embedder, usersEnr)
 	#

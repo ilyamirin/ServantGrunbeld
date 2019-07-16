@@ -112,7 +112,7 @@ class DataBase:
 				return self._getFullKeys(file)
 
 
-	def put(self, name, value, shape=(256,)):
+	def put(self, name, value):
 		if self.locked:
 			raise PermissionError("Data base is locked")
 
@@ -123,7 +123,7 @@ class DataBase:
 					data[...] = value
 
 				else:
-					file.create_dataset(name=name, shape=shape, data=value, dtype=np.float32, chunks=True)
+					file.create_dataset(name=name, shape=value.shape, data=value, dtype=np.float32, chunks=True)
 
 				if self.base is not None:
 					self._putNested(self.base, name, value)

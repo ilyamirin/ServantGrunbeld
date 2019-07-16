@@ -15,7 +15,6 @@ AUTO_DURATION_LIMIT = "duration_limit"
 MANUAL_KEYBOARD = "keyboard"
 
 
-
 class MicrophoneRecorder:
 	def __init__(self, audioFormat=pyaudio.paInt16, chunkSize=1024, rate=16000, silenceThreshold=500, initPipe=False,
 	             name="your_microphone"):
