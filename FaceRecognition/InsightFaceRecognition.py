@@ -198,6 +198,8 @@ class FaceRecognizer:
 			result = name if (score < minScore and score < unknownThreshold) else result
 			minScore = score if score < minScore else minScore
 
+		result = self._checkOutgouingName(result)
+
 		return result, scores
 
 
@@ -286,6 +288,11 @@ def webCamera(webcamID, action, framesLimit=None, **kwargs):
 def videoStream(filepath, action, **kwargs):
 	cap = cv2.VideoCapture(filepath)
 
+	captureSize = (640, 480)
+
+	cap.set(cv2.CAP_PROP_FRAME_WIDTH, captureSize[0])
+	cap.set(cv2.CAP_PROP_FRAME_HEIGHT, captureSize[1])
+
 	success, frame = cap.read()
 	assert success
 
@@ -316,19 +323,33 @@ def identify(recognizer:FaceRecognizer, users):
 				                                                             usr.get("name"), usr.get("scores")))
 
 
+def enrollAuto(embedder:FaceRecognizer, usersPath):
+	for usrFolder in os.listdir(usersPath):
+		if not os.path.isdir(os.path.join(usersPath, usrFolder)):
+			continue
+
+		name = usrFolder.split("_")[0]
+		enrFolder = os.path.join(usersPath, usrFolder, "enr")
+
+		embedder.enrollFromFolder(enrFolder, name)
+
+
+def identifyAuto(embedder:FaceRecognizer, usersPath):
+	for usrFolder in os.listdir(usersPath):
+		if not os.path.isdir(os.path.join(usersPath, usrFolder)):
+			continue
+
+		name = usrFolder.split("_")[0]
+		verFolder = os.path.join(usersPath, usrFolder, "ver")
+
+		for file in os.listdir(verFolder):
+			users = embedder.identifyViaImageFile(os.path.join(verFolder, file))
+			for usr in users:
+				print("File {}\nTRUE {}\tPREDICTION {}\nscores: {}\n".format(file, name,
+				                                                             usr.get("name"), usr.get("scores")))
+
+
 def main():
-	usersEnroll = {
-		"Anton": r"D:\data\Faces\MySets\Anton\enr",
-		"Alina": r"D:\data\Faces\MySets\Alina\enr",
-		"Tanya": r"D:\data\Faces\MySets\Tanya\enr"
-	}
-
-	usersIdentify = {
-		"Anton": r"D:\data\Faces\MySets\Anton\ver",
-		"Alina": r"D:\data\Faces\MySets\Alina\ver",
-		"Tanya": r"D:\data\Faces\MySets\Tanya\ver"
-	}
-
 	dataBase = DataBase(
 		filepath="./Temp/users_face_exp.hdf"
 	)
@@ -345,10 +366,14 @@ def main():
 		detector=detector
 	)
 
+	# enrollAuto(recognizer, r"D:\data\Faces\Friends")
+	# identifyAuto(recognizer, r"D:\data\Faces\Friends")
+	recognizer.identifyViaVideoFile(filepath=r"D:\data\Faces\Friends\FRIENDS - Season 6 Intro A [HD].mp4")
+
 	# enroll(recognizer, usersEnroll)
 	# identify(recognizer, usersIdentify)
 	# recognizer.enrollFromCamera(0, "Anton", show=True)
-	recognizer.identifyViaCamera(1)
+	# recognizer.identifyViaCamera(0)
 	# recognizer.identifyViaVideoFile(r"D:\data\Faces\Demo.avi")
 
 
