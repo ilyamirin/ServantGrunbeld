@@ -7,7 +7,8 @@ from numpy.linalg import norm
 
 import torch
 
-from DataBase import DataBase
+from ProjectUtils.DataBase import DataBase
+from ProjectUtils.Microphone import AUTO_DURATION_LIMIT
 
 try:
 	from .Identification import SpeakerIdentifier
@@ -136,7 +137,7 @@ class Identifier(SpeakerIdentifier):
 
 	def identifyViaMicrophone(self):
 		with self.microphone as micro:
-			audio = micro.recordAuto(addSilence=False)
+			audio = micro.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=8, addSilence=False)
 
 		results, scores = self.identifyViaFile(audio)
 		results = self._checkOutgouingName(results)
@@ -208,11 +209,11 @@ def main():
 		dataBase=dataBase
 	)
 
-	enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
-	identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+	# enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+	# identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
 
-	# result, _ = embedder.identifyViaMicrophone()
-	# print(result)
+	result, _ = embedder.identifyViaMicrophone()
+	print(result)
 
 	# enroll(embedder, usersEnr)
 	#

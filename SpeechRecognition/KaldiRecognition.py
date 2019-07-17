@@ -5,7 +5,7 @@ except ImportError:
     from Config import KaldiConfig, AimlConfig
     from RecognitionModule import Recognizer
 
-from Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT, AUTO_SILENCE_LIMIT
+from ProjectUtils.Microphone import MicrophoneRecorder
 import socket
 import sys
 import subprocess

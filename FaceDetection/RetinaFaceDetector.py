@@ -300,11 +300,10 @@ def inferenceSpeedTest(detector: RetinaFace, image, maxSize=640):
 
 
 def test():
+	from ProjectUtils.Renderers import OpenCVRenderer as rnd
 	try:
-		from .Renderers import OpenCVRenderer as rnd
 		from .Config import DetectorConfig
 	except ImportError:
-		from Renderers import OpenCVRenderer as rnd
 		from Config import DetectorConfig
 
 	detector = RetinaFace(

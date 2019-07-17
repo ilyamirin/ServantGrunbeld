@@ -1,5 +1,3 @@
-import io
-
 import pyaudio
 import wave
 
@@ -81,7 +79,7 @@ def test():
 
 
 def testTandem():
-	from Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT
+	from Utils.Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT
 	microphone = MicrophoneRecorder()
 	player = Player()
 

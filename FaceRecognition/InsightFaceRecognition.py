@@ -5,12 +5,15 @@ import mxnet as mx
 import cv2
 
 from numpy.linalg import norm
-from time import time
 
+from ProjectUtils.Renderers import OpenCVRenderer as renderer
+from ProjectUtils.DataBase import DataBase
 from FaceDetection.RetinaFaceDetector import RetinaFace
-from FaceDetection.Renderers import OpenCVRenderer as renderer
-from FaceRecognition.Preprocessing import preprocessFace
-from DataBase import DataBase
+
+try:
+	from .Preprocessing import preprocessFace
+except ImportError:
+	from Preprocessing import preprocessFace
 
 
 class TooManyFaces(Exception):
@@ -203,7 +206,7 @@ class FaceRecognizer:
 		return result, scores
 
 
-	def _identifyVideoStream(self, frame, windowName):
+	def _identifyVideoStream(self, frame, show, windowName):
 		embeddings, boxes, landmarks = self._processImageTensor(frame)
 
 		users = []
@@ -211,19 +214,20 @@ class FaceRecognizer:
 			result, scores = self.identify(embed)
 			users.append(result)
 
-		frame = renderer.drawBoxes(frame, boxes, text=users, adaptiveToImage=True, occurrence="outer",
-		                           fillTextBox=False)
+		if show:
+			frame = renderer.drawBoxes(frame, boxes, text=users, adaptiveToImage=True, occurrence="outer",
+			                           fillTextBox=False)
 
-		cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
-		cv2.imshow(windowName, frame)
-
-
-	def identifyViaCamera(self, webcamID, windowName="Video identification"):
-		webCamera(webcamID, self._identifyVideoStream, windowName=windowName)
+			cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
+			cv2.imshow(windowName, frame)
 
 
-	def identifyViaVideoFile(self, filepath, windowName="Video identification"):
-		videoStream(filepath, self._identifyVideoStream, windowName=windowName)
+	def identifyViaCamera(self, webcamID, show=True, windowName="Video identification"):
+		webCamera(webcamID, self._identifyVideoStream, show=show, windowName=windowName)
+
+
+	def identifyViaVideoFile(self, filepath, show=True, windowName="Video identification"):
+		videoStream(filepath, self._identifyVideoStream, show=show, windowName=windowName)
 
 
 	def identifyViaImageFile(self, filepath, readMode=1):
@@ -368,12 +372,12 @@ def main():
 
 	# enrollAuto(recognizer, r"D:\data\Faces\Friends")
 	# identifyAuto(recognizer, r"D:\data\Faces\Friends")
-	recognizer.identifyViaVideoFile(filepath=r"D:\data\Faces\Friends\FRIENDS - Season 6 Intro A [HD].mp4")
+	# recognizer.identifyViaVideoFile(filepath=r"D:\data\Faces\Friends\FRIENDS - Season 6 Intro A [HD].mp4")
 
 	# enroll(recognizer, usersEnroll)
 	# identify(recognizer, usersIdentify)
 	# recognizer.enrollFromCamera(0, "Anton", show=True)
-	# recognizer.identifyViaCamera(0)
+	recognizer.identifyViaCamera(0)
 	# recognizer.identifyViaVideoFile(r"D:\data\Faces\Demo.avi")
 
 

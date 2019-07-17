@@ -1,4 +1,4 @@
-from Microphone import MicrophoneRecorder
+from ProjectUtils.Microphone import MicrophoneRecorder
 
 
 class SpeakerIdentifier:

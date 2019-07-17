@@ -4,7 +4,7 @@ import time
 
 from xml.etree import ElementTree
 
-from AudioPlayer import Player
+from ProjectUtils.AudioPlayer import Player
 
 try:
 	from .Config import AzureCredentials, AzureConfig

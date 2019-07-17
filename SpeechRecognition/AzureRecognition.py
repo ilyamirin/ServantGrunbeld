@@ -6,7 +6,7 @@ try:
 except ImportError:
 	hasAzureSDK = False
 
-from Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT, AUTO_SILENCE_LIMIT
+from ProjectUtils.Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT
 
 try:
 	from .Config import AzureCredentials, AzureConfig
@@ -138,7 +138,7 @@ class AzureRecognizer(Recognizer):
 
 
 
-def testAzureSDK(recognizer):
+def testAzureSDK(recognizer:AzureRecognizer):
 	attempts = 3
 
 	print("Here you go")
@@ -147,7 +147,7 @@ def testAzureSDK(recognizer):
 		recognizer.handleResponseSDK(result)
 
 
-def testAzureREST(recognizer):
+def testAzureREST(recognizer:AzureRecognizer):
 	attempts = 3
 
 	print("Here you go")

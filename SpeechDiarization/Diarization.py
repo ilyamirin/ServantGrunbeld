@@ -1,4 +1,4 @@
-from Microphone import MicrophoneRecorder
+from Utils.Microphone import MicrophoneRecorder
 
 
 class BadFileFormat(Exception):
