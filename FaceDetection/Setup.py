@@ -14,11 +14,6 @@ class RestrictedVersion(Exception):
 	pass
 
 
-if not "PYCHARM_HOSTED" in os.environ:
-	import colorama
-	colorama.init()
-
-
 def checkCuda():
 	allowedCudaVersions = [101, 100, 92, 90, 80]
 
