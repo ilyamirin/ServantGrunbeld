@@ -9,11 +9,14 @@ from numpy.linalg import norm
 from ProjectUtils.Renderers import OpenCVRenderer as renderer
 from ProjectUtils.DataBase import DataBase
 from FaceDetection.RetinaFaceDetector import RetinaFace
+from FaceDetection.Config import DetectorConfig
 
 try:
 	from .Preprocessing import preprocessFace
+	from .Config import RecognizerConfig
 except ImportError:
 	from Preprocessing import preprocessFace
+	from Config import RecognizerConfig
 
 
 class TooManyFaces(Exception):
@@ -359,13 +362,13 @@ def main():
 	)
 
 	detector = RetinaFace(
-		prefix=r"D:\git_projects\FEFU\PipeleneDraft\FaceDetection\Data\R50",
-		epoch=0
+		prefix=DetectorConfig.PREFIX,
+		epoch=DetectorConfig.EPOCH
 	)
 
 	recognizer = FaceRecognizer(
-		prefix=r"D:\git_projects\FEFU\PipeleneDraft\FaceRecognition\Data\model",
-		epoch=0,
+		prefix=RecognizerConfig.PREFIX,
+		epoch=RecognizerConfig.EPOCH,
 		dataBase=dataBase,
 		detector=detector
 	)

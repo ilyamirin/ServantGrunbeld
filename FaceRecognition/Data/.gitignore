@@ -1,4 +1,4 @@
 *
 !.gitignore
 !weightsURL.txt
-!model-symbol.json
+!face_recognition_model-symbol.json

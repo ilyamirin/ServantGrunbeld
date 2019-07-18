@@ -71,7 +71,7 @@ def downloadFile(url, filename):
 
 def downloadWeights():
 	folder = os.path.join(_curPath, "Data")
-	filename = "face_recognition_model-0000.params"
+	filename = "face_recognition_model-00004.params"
 
 	print("\nModel weights will be downloaded. Proceed? (y/n)")
 	answer = requireAnswer()
@@ -81,7 +81,7 @@ def downloadWeights():
 	elif answer in ["n", "no"]:
 		return
 
-	url = "https://www.dropbox.com/s/um4enc3hmcn83y6/face_detection_model-0000.params?dl=1"
+	url = "https://www.dropbox.com/s/m84hve1x76v7vng/face_recognition_model-0000.params?dl=1"
 
 	print("Downloading model weights ...")
 
