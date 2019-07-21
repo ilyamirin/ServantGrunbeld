@@ -4,5 +4,6 @@ class Config:
     MANAGER_PORT = 10020
     MGR_WS_URI = f"ws://{MANAGER_HOST}:{MANAGER_PORT}"
     RECONNECT_TIMEOUT = 0.3  # секунд
-    WINDOW_NAME = "Ты"
+    WINDOW_NAME = "You"
     FPS = 30
+    FRAMES_QUEUE_MAX_LEN = 10
