@@ -51,19 +51,15 @@ handle_message = {
 }
 
 
-async def listen_client(client):
+async def accept_client(request):
+    client = web.WebSocketResponse()
+    await client.prepare(request)
     async for ws_msg in client:
         if ws_msg.type == aiohttp.WSMsgType.BINARY:
             message: Message = Message.loads(ws_msg.data)
             await handle_message[message.type](client, message)
         elif ws_msg.type == aiohttp.WSMsgType.ERROR:
             print('ws connection closed with exception %s' % client.exception())
-
-
-async def accept_client(request):
-    client = web.WebSocketResponse()
-    await client.prepare(request)
-    asyncio.get_event_loop().create_task(listen_client(client))
     return web.Response(text="OK")
 
 
