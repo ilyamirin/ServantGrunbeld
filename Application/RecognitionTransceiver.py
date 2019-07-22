@@ -7,18 +7,21 @@ except ModuleNotFoundError:
 from SpeechRecognition.KaldiRecognition import KaldiOnlineRecognizer
 import aiohttp
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 
 rec = KaldiOnlineRecognizer()
 rec.start()
+e = ThreadPoolExecutor()
 
 
 async def listen_recognizer(server):
     while True:
-        data = await asyncio.get_event_loop().sock_recv(rec.kaldi_socket, 1024)
+        data = await asyncio.get_event_loop().run_in_executor(e, rec.recv)
         if data.strip() == "":
             continue
-        tp = Message.RECOGNIZED_SPEECH if '\n' in data else Message.RECOGNIZED_SPEECH_PART
+        tp = Message.RECOGNIZED_SPEECH if b'\n' in data else Message.RECOGNIZED_SPEECH_PART
+        print(data.strip().decode(), flush=True)
         message = Message(data=data, type_=tp).dumps()
         await server.send_bytes(message)
 
@@ -33,7 +36,7 @@ async def main():
             async for ws_msg in mgr:
                 if ws_msg.type == aiohttp.WSMsgType.BINARY:
                     message: Message = Message.loads(ws_msg.data)
-                    await asyncio.get_event_loop().sock_sendall(message.data)
+                    await asyncio.get_event_loop().sock_sendall(rec.kaldi_socket, message.data)
                 elif ws_msg.type == aiohttp.WSMsgType.ERROR:
                     print('ws connection closed with exception %s' % mgr.exception())
     except ConnectionRefusedError:
