@@ -9,10 +9,13 @@ import aiohttp
 import cv2
 from queue import Queue, Empty, Full
 import pygame
+import sys
+import time
 
 
 pygame.init()
 mixer = pygame.mixer
+mixer.init(channels=1)
 frames_to_display = Queue(maxsize=CFG.FRAMES_QUEUE_MAX_LEN)
 
 
@@ -28,8 +31,20 @@ async def recv_user_request():
     await None
 
 
-async def play_robovoice(message: Message):
-    sound = pygame.mixer.Sound(buffer=message.data)
+async def synthesize_voice(text):
+    proc = await asyncio.create_subprocess_shell(
+        f"text2wave -f {CFG.FESTIVAL_FREQ} -eval '(voice_msu_ru_nsh_clunits)'",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate(text.encode())
+    if stderr:
+        print(stderr.decode(), file=sys.stderr)
+    return stdout
+
+
+def play_robovoice(audio_bytes):
+    sound = mixer.Sound(buffer=audio_bytes)
     sound.play()
 
 
@@ -47,8 +62,12 @@ async def handle_message(server, ws_msg):
         message: Message = Message.loads(ws_msg.data)
         if message.type == Message.VIDEO_FRAME:
             await display_frame(message)
+        if message.type == Message.RECOGNIZED_SPEECH_PART:
+            print(message.data, flush=True)
         if message.type == Message.RECOGNIZED_SPEECH:
             print(message.data, flush=True)
+            voice = await synthesize_voice(message.data)
+            play_robovoice(voice)
     elif ws_msg.type == aiohttp.WSMsgType.ERROR:
         print('ws connection closed with exception %s' % server.exception())
 

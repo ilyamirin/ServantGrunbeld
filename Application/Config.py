@@ -7,3 +7,4 @@ class Config:
     WINDOW_NAME = "You"
     FPS = 30
     FRAMES_QUEUE_MAX_LEN = 10
+    FESTIVAL_FREQ = 35000
