@@ -118,10 +118,11 @@ class MicrophoneRecorder:
 				if not soundStarted:
 					soundStarted = True
 				else:
-					record.extend(soundData)
 					silentFrames = 0
 			elif silent and soundStarted:
 				silentFrames += 1
+
+			record.extend(soundData)
 
 			if mode == MANUAL_KEYBOARD:
 				doRecord = not threshold

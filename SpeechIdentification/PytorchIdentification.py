@@ -8,16 +8,18 @@ from numpy.linalg import norm
 import torch
 
 from ProjectUtils.DataBase import DataBase
-from ProjectUtils.Microphone import AUTO_DURATION_LIMIT
+from ProjectUtils.Microphone import AUTO_DURATION_LIMIT, AUTO_SILENCE_LIMIT
 
 try:
 	from .Identification import SpeakerIdentifier
 	from .AudioPreprocessing import preprocess_file
 	from .Model import SpeakerEncoder
+	from .Config import RecognizerConfig
 except ImportError:
 	from Identification import SpeakerIdentifier
 	from AudioPreprocessing import preprocess_file
 	from Model import SpeakerEncoder
+	from Config import RecognizerConfig
 
 
 class Identifier(SpeakerIdentifier):
@@ -44,6 +46,8 @@ class Identifier(SpeakerIdentifier):
 
 
 	def _getEmbedding(self, utterance):
+		utterance = torch.from_numpy(utterance).to(self.device)
+
 		embeddings = self.net.forward(utterance).cpu().data.numpy()
 
 		embedding = np.average(embeddings, axis=0)
@@ -53,8 +57,6 @@ class Identifier(SpeakerIdentifier):
 
 	def _getEmbeddingFromFile(self, file):
 		audio = preprocess_file(file)
-		audio = torch.from_numpy(audio).to(self.device)
-
 		return self._getEmbedding(audio)
 
 
@@ -72,7 +74,8 @@ class Identifier(SpeakerIdentifier):
 		return "/".join(name)
 
 
-	def _checkOutgouingName(self, name):
+	@staticmethod
+	def _checkOutgoingName(name):
 		name = name.split("/")
 
 		if name[-1] in string.digits:
@@ -84,18 +87,22 @@ class Identifier(SpeakerIdentifier):
 	def enroll(self, name, vector):
 		assert self.dataBase is not None
 
+		name = self._checkIncomingName(name)
 		self.dataBase.put(name, vector)
+
 		print("User {} has been enrolled".format(name))
+
+
+	def enrollFromFile(self, file, name):
+		embedding = self._getEmbeddingFromFile(file)
+		self.enroll(name, embedding)
 
 
 	def enrollFromMicrophone(self, name):
 		with self.microphone as micro:
 			audio = micro.recordManual()
 
-		embedding = self._getEmbeddingFromFile(audio)
-
-		name = self._checkIncomingName(name)
-		self.enroll(name, embedding)
+		self.enrollFromFile(audio, name)
 
 
 	def enrollFromFolder(self, name, folder):
@@ -109,11 +116,10 @@ class Identifier(SpeakerIdentifier):
 
 		vector = np.average(vector, axis=0)
 
-		name = self._checkIncomingName(name)
 		self.enroll(name, vector)
 
 
-	def identify(self, vector, unknownThreshold=0.4):
+	def identify(self, vector, unknownThreshold=0.3):
 		assert self.dataBase is not None
 
 		scores = {}
@@ -132,22 +138,22 @@ class Identifier(SpeakerIdentifier):
 			result = name if (score < minScore and score < unknownThreshold) else result
 			minScore = score if score < minScore else minScore
 
+		result = self._checkOutgoingName(result)
+
 		return result, scores
 
 
-	def identifyViaMicrophone(self):
-		with self.microphone as micro:
-			audio = micro.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=8, addSilence=False)
-
-		results, scores = self.identifyViaFile(audio)
-		results = self._checkOutgouingName(results)
+	def identifyViaFile(self, file, unknownThreshold=0.3):
+		results, scores = self.identify(self._getEmbeddingFromFile(file), unknownThreshold)
 
 		return results, scores
 
 
-	def identifyViaFile(self, filepath):
-		results, scores = self.identify(self._getEmbeddingFromFile(filepath))
-		results = self._checkOutgouingName(results)
+	def identifyViaMicrophone(self, unknownThreshold=0.3):
+		with self.microphone as micro:
+			audio = micro.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=6, addSilence=False)
+
+		results, scores = self.identifyViaFile(audio, unknownThreshold)
 
 		return results, scores
 
@@ -200,12 +206,12 @@ def main():
 	}
 
 	dataBase = DataBase(
-		filepath=r"./Temp/users_new_base.hdf",
+		filepath=r"./Temp/users_base.hdf",
 		showBase=True
 	)
 
 	embedder = Identifier(
-		modelpath=r"D:\data\Speech\TIMIT\speech_id_checkpoint\pretrained.pt",
+		modelpath=RecognizerConfig.MODEL_PATH,
 		dataBase=dataBase
 	)
 

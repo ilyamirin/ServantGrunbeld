@@ -75,11 +75,12 @@ class Player:
 
 def test():
 	player = Player()
-	player.playAudioFile(r"D:\data\Speech\Voices_audio\MySets\tanya\ver\tanya_ver1.wav")
+	player.playAudioFile(r"D:\git_projects\FEFU\PipeleneDraft\Temp\new_record.wav")
 
 
 def testTandem():
-	from Utils.Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT
+	from ProjectUtils.Microphone import MicrophoneRecorder, AUTO_DURATION_LIMIT
+
 	microphone = MicrophoneRecorder()
 	player = Player()
 

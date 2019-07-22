@@ -79,7 +79,7 @@ class FaceRecognizer:
 		return "/".join(name)
 
 
-	def _checkOutgouingName(self, name):
+	def _checkOutgoingName(self, name):
 		name = name.split("/")
 
 		if name[-1] in string.digits:
