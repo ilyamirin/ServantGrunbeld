@@ -50,6 +50,10 @@ class KaldiOnlineRecognizer(Recognizer):
             raise RuntimeError("Не удалось запустить распознаватель")
         print("Говорите...", flush=True)
 
+    def stop(self):
+        pass
+
+    def runLoop(self):
         sentence = []
         self.record = []
         while True:
@@ -65,9 +69,6 @@ class KaldiOnlineRecognizer(Recognizer):
                     func(b"".join(sentence).decode("utf-8"))
                 break
 
-    def stop(self):
-        pass
-
     def processAudio(self, record):
         # send a chunk over tcp socket
         pass
@@ -80,7 +81,7 @@ class KaldiOnlineRecognizer(Recognizer):
         # record = self.microphone.recordManual()
         # result = self.processAudio(record)
 
-    def processChunk(self, data):
+    def sendChunk(self, data):
         # src/online2bin/online2-tcp-nnet3-decode-faster
         # печатает \r в конце каждой lattice
         # \n в конце feature pipeline
@@ -88,6 +89,9 @@ class KaldiOnlineRecognizer(Recognizer):
         """Скормить огрызок распознавалке"""
         if self.kaldi_socket is not None and self.connected:
             self.kaldi_socket.send(data)
+
+    def recv(self, bufsize=1024):
+        return self.kaldi_socket.recv(bufsize)
 
     def registerIntermediateRecognitionHandler(self, callback):
         self.handle_intermediate.append(callback)
@@ -106,7 +110,7 @@ class PyAudioHelper:
         )
 
     def streamCallback(self, in_data, frame_count, time_info, status):
-        self.recognizer.processChunk(in_data)
+        self.recognizer.sendChunk(in_data)
         return in_data, pyaudio.paContinue if self.session_running else pyaudio.paComplete
 
     def handleIntermediate(self, text):

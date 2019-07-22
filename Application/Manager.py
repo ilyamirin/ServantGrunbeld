@@ -29,11 +29,12 @@ async def remove_client(client):
         lst.discard(client)
 
 
-message_type_handler = {
-    Message.AUDIO_CHUNK: transfer_to_subscribers,
-    Message.VIDEO_FRAME: transfer_to_subscribers,
-    Message.RECOGNIZED_SPEECH: transfer_to_subscribers,
-    Message.SUBSCRIBE: handle_subscribe_intent,
+message_type_handlers = {
+    Message.AUDIO_CHUNK: [transfer_to_subscribers],
+    Message.VIDEO_FRAME: [transfer_to_subscribers],
+    Message.RECOGNIZED_SPEECH: [transfer_to_subscribers],
+    Message.RECOGNIZED_SPEECH_PART: [transfer_to_subscribers],
+    Message.SUBSCRIBE: [handle_subscribe_intent],
 }
 
 
@@ -43,7 +44,8 @@ async def accept_client(request):
     async for ws_msg in client:
         if ws_msg.type == aiohttp.WSMsgType.BINARY:
             message: Message = Message.loads(ws_msg.data)
-            await message_type_handler[message.type](client, message)
+            for handle in message_type_handlers[message.type]:
+                await handle(client, message)
         elif ws_msg.type == aiohttp.WSMsgType.ERROR:
             print('ws connection closed with exception %s' % client.exception())
     return web.Response(text="OK")

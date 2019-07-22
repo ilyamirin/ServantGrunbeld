@@ -23,13 +23,12 @@ def streamCallback(in_data, frame_count, time_info, status):
 async def main():
     try:
         print("Trying to connect...", end=' ', flush=True)
-        async with aiohttp.ClientSession() as session, session.ws_connect(CFG.MGR_WS_URI) as ws:
+        async with aiohttp.ClientSession() as session, session.ws_connect(CFG.MGR_WS_URI) as mgr:
             print("connected", flush=True)
             while True:
                 chunk = chunks.get(block=True)
                 message = Message(data=chunk, type_=Message.AUDIO_CHUNK, device_id=CFG.DEVICE_ID).dumps()
-                await ws.send_bytes(message)
-                # await ws.send_bytes(Message(data="мартышка", type_=Message.RECOGNIZED_SPEECH, device_id=CFG.DEVICE_ID).dumps())
+                await mgr.send_bytes(message)
     except ConnectionRefusedError:
         print("refused", flush=True)
     except Exception as e:

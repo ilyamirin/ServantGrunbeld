@@ -10,6 +10,7 @@ class Message:
     RECOGNIZED_FACE_ROI = 4
     BOT_ANSWER = 5
     ROBOVOICE = 6
+    RECOGNIZED_SPEECH_PART = 7
 
     def __init__(self, timestamp=None, type_=None, data=None, device_id=None):
         self.type = type_

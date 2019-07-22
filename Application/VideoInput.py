@@ -17,14 +17,14 @@ import time
 async def main():
     try:
         print("Trying to connect...", end=' ', flush=True)
-        async with aiohttp.ClientSession() as session, session.ws_connect(CFG.MGR_WS_URI) as ws:
+        async with aiohttp.ClientSession() as session, session.ws_connect(CFG.MGR_WS_URI) as mgr:
             print("connected", flush=True)
             cam = cv2.VideoCapture(0)
             while True:
                 (grabbed, frame), now = cam.read(), time.time()
                 if grabbed:
                     message = Message(data=frame, type_=Message.VIDEO_FRAME, device_id=CFG.DEVICE_ID).dumps()
-                    await ws.send_bytes(message)
+                    await mgr.send_bytes(message)
                 await asyncio.sleep(max((now + 1.0/CFG.FPS) - time.time(), 0))
     except ConnectionRefusedError:
         print("refused", flush=True)
