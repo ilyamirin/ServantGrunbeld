@@ -8,8 +8,11 @@ import asyncio
 import aiohttp
 import cv2
 from queue import Queue, Empty, Full
+import pygame
 
 
+pygame.init()
+mixer = pygame.mixer
 frames_to_display = Queue(maxsize=CFG.FRAMES_QUEUE_MAX_LEN)
 
 
@@ -25,8 +28,9 @@ async def recv_user_request():
     await None
 
 
-async def play_robovoice():
-    await None
+async def play_robovoice(message: Message):
+    sound = pygame.mixer.Sound(buffer=message.data)
+    sound.play()
 
 
 async def display_frame(message: Message):
@@ -36,11 +40,6 @@ async def display_frame(message: Message):
     except Full:
         frames_to_display.get_nowait()
         frames_to_display.put_nowait(frame)
-
-
-async def display_user_requests():
-    while True:
-        await play_robovoice()
 
 
 async def handle_message(server, ws_msg):
@@ -76,7 +75,7 @@ async def main():
         except ConnectionRefusedError:
             print("refused", flush=True)
         except Exception as e:
-            print(f"Unexpected exception: {e.with_traceback()}", flush=True)
+            print(f"Unexpected exception: {e}", flush=True)
         await asyncio.sleep(CFG.RECONNECT_TIMEOUT)
 
 
@@ -90,7 +89,7 @@ async def cam():
         except Empty:
             pass
         except Exception as e:
-            print(f"Unexpected exception: {e.with_traceback()}", flush=True)
+            print(f"Unexpected exception: {e}", flush=True)
         await asyncio.sleep(1/(CFG.FPS**2))
 
 
