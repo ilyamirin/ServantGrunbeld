@@ -1,33 +1,108 @@
 import socket
+import select
 import pickle
-from struct import pack, unpack, error
+from struct import pack, unpack
+
+from multiprocessing import Process
 
 from . import Tasks
+from ProjectUtils.DataBase import DataBase
+from SpeechIdentification.Config import IdentifierConfig
 from SpeechIdentification.PytorchIdentification import Identifier
 
 
-class IdentifierServer(Identifier):
-	def __init__(self, modelpath, dataBase, address:tuple, clientsLimit=3, chunkSize=4096):
-		super().__init__(modelpath, dataBase)
+class IdentifierServer:
+	def __init__(self, address: tuple, maxClients=3):
+		super().__init__()
 
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
 		self.socket.bind(address)
-		self.socket.listen(clientsLimit)
+		self.socket.listen(maxClients)
 
-		self.chunkSize = chunkSize
+		self.processes = []
 
-		self.running = False
+		self._running = False
 
 
-	def _getRequest(self, clientSocket, clientAddress):
-		request = clientSocket.recv(8)
+	def _addressAsString(self, address):
+		return ":".join((str(i) for i in address))
+
+
+	def close(self):
+		print(f"Closing server socket {self._addressAsString(self.socket.getsockname())}")
+
+		for pr in self.processes:
+			pr.stop()
+			pr.join()
+
+		if self.socket:
+			self.socket.close()
+			self.socket = None
+
+
+	def run(self):
+		print(f"Starting a new Identifier server at {self._addressAsString(self.socket.getsockname())}")
+
+		self._running = True
+		while self._running:
+			self.socket.settimeout(1)
+			try:
+				clientSocket, clientAddress = self.socket.accept()
+			except socket.timeout:
+				clientSocket = None
+
+			if clientSocket:
+				id_ = len(self.processes)
+				clientProcess = IdentifierProcess(clientSocket, self._addressAsString(clientAddress), id_)
+				self.processes.append(clientProcess)
+
+				clientProcess.start()
+
+		self.close()
+
+
+	def stop(self):
+		self._running = False
+
+
+class IdentifierProcess(Process):
+	def __init__(self, socket_, address, id_):
+		super().__init__()
+
+		self.socket = socket_
+		self.address = address
+
+		self.chunkSize = 4096
+
+		self.id = id_
+
+		self._running = False
+
+
+	def _initHandler(self):
+		dataBase = DataBase(
+			filepath=r"D:\git_projects\FEFU\PipeleneDraft\SpeechIdentification\Temp\users_new_base.hdf",
+		)
+		identifier = Identifier(
+			modelpath=IdentifierConfig.MODEL_PATH,
+			dataBase=dataBase
+		)
+
+		return identifier
+
+
+	def _getRequest(self):
+		request = self.socket.recv(8)
 		length = unpack(">Q", request)
 
 		request = b""
 		while len(request) < length[0]:
-			request += clientSocket.recv(self.chunkSize)
+			request += self.socket.recv(self.chunkSize)
 
-		print(f"Received request from client {clientAddress}, unpickling it")
+		print("Process {:7<}\tclient address {}: Received request from client".
+			      format(self.id, self.address))
 
 		request = pickle.loads(request)
 
@@ -41,38 +116,38 @@ class IdentifierServer(Identifier):
 		return response
 
 
-	def handleRequest(self, requestDict):
-		task = requestDict.get("task")
+	def _handleRequest(self, request):
+		task = request.get("task")
 
-		name = requestDict.get("name", "Unknown")
+		name = request.get("name", "Unknown")
 		results = None
 
 		if task == Tasks.enroll:
-			vector = requestDict.get("vector")
-			self.enroll(name, vector)
+			vector = request.get("vector")
+			self.handler.enroll(name, vector)
 
 		elif task == Tasks.enrollFromFile:
-			file = requestDict.get("file")
+			file = request.get("file")
 
-			self.enrollFromFile(file, name)
+			self.handler.enrollFromFile(file, name)
 
 		elif task == Tasks.identifyViaFile:
-			file = requestDict.get("file")
-			threshold = requestDict.get("unknownThreshold", 0.4)
+			file = request.get("file")
+			threshold = request.get("unknownThreshold", 0.4)
 
-			results = self.identifyViaFile(file, threshold)
+			results = self.handler.identifyViaFile(file, threshold)
 
 		elif task == Tasks._getEmbedding:
-			utterance = requestDict.get("utterance")
-			results = self._getEmbedding(utterance)
+			utterance = request.get("utterance")
+			results = self.handler._getEmbedding(utterance)
 
 		elif task == Tasks._getEmbeddingFromFile:
-			file = requestDict.get("file")
+			file = request.get("file")
 
-			results = self._getEmbeddingFromFile(file)
+			results = self.handler._getEmbeddingFromFile(file)
 
 		elif task == Tasks._checkIncomingName:
-			results = self._checkIncomingName(name)
+			results = self.handler._checkIncomingName(name)
 
 		else:
 			raise NotImplementedError
@@ -80,53 +155,85 @@ class IdentifierServer(Identifier):
 		return results
 
 
+	def _process(self):
+		try:
+			request = self._getRequest()
+
+			results = self._handleRequest(request)
+
+			response = {
+				"status": 200,
+				"results": results
+			}
+
+		except ConnectionAbortedError:
+			print("Process {:7<}\tclient address {}: Connection has been closed by client".
+			      format(self.id, self.address))
+
+			self.stop()
+			return
+
+		except ConnectionResetError:
+			print("Process {:7<}\tclient address {}: Connection has been closed by client".
+			      format(self.id, self.address))
+
+			self.stop()
+			return
+
+		except Exception as e:
+			response = {
+				"status": 500,
+				"message": e
+			}
+
+		finally:
+			if self._running:
+				response = self._packResponse(response)
+				self.socket.sendall(response)
+
+				print("Process {:7<}\tclient address {}: Response has been sent".
+				      format(self.id, self.address))
+
+			else:
+				return
+
+
 	def run(self):
-		self.running = True
+		print("Process {:7<}\tclient address {}: Process has started".format(self.id, self.address))
 
-		print("Server running at {}".format(":".join(str(i) for i in (self.socket.getsockname()))))
-		while self.running:
-			# self.socket.settimeout(1)
+		self.handler = self._initHandler()
 
-			try:
-				clientSocket, clientAddress = self.socket.accept()
-			except:
-				clientSocket = None
+		self._running = True
+		while self._running:
+			if self.socket:
+				try:
+					readyRead, readyWrite, errors = select.select([self.socket], [self.socket], [], 1)
 
-			if clientSocket:
-				clientAddressString = ":".join((str(i) for i in clientAddress))
-				print(f"Connection with {clientAddressString} is established")
+				except select.error as e:
+					print("Process {:7<}\twith client address {}: Process has failed with error\n: {}".
+					      format(self.id, self.address, e))
 
-				opened = True
-				while opened:
-					try:
-						request = self._getRequest(clientSocket, clientAddressString)
+					self.stop()
+					return
 
-						results = self.handleRequest(request)
+				if len(readyRead) > 0:
+					self._process()
 
-						response = {
-							"status": 200,
-							"results": results
-						}
+			else:
+				print("Process {:7<}\tclient address {}: Client is not connected, can't receive data".
+				      format(self.id, self.address))
 
-					except ConnectionAbortedError:
-						opened = False
-						clientSocket.close()
+				self.stop()
+		self.close()
 
-					except Exception as e:
-						response = {
-							"status": 500,
-							"message": e
-						}
 
-					finally:
-						try:
-							if clientSocket._closed:
-								break
+	def stop(self):
+		self._running = False
 
-							response = self._packResponse(response)
-							clientSocket.sendall(response)
 
-							print(f"Response has been sent to {clientAddressString}")
+	def close(self):
+		if self.socket:
+			print("Process {:7<}\tclient address {}: Closing connection".
+			      format(self.id, self.address))
 
-						except Exception as e:
-							print(e)
+			self.socket.close()

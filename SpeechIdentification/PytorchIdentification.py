@@ -14,7 +14,7 @@ try:
 	from .Identification import SpeakerIdentifier
 	from .AudioPreprocessing import preprocess_file
 	from .Model import SpeakerEncoder
-	from .Config import RecognizerConfig
+	from .Config import IdentifierConfig
 except ImportError:
 	from Identification import SpeakerIdentifier
 	from AudioPreprocessing import preprocess_file
@@ -211,7 +211,7 @@ def main():
 	)
 
 	embedder = Identifier(
-		modelpath=RecognizerConfig.MODEL_PATH,
+		modelpath=IdentifierConfig.MODEL_PATH,
 		dataBase=dataBase
 	)
 

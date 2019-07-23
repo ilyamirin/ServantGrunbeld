@@ -1,7 +1,7 @@
 import os
 
 
-class RecognizerConfig:
+class IdentifierConfig:
 	_currpath = os.path.dirname(os.path.abspath(__file__))
 
 	MODEL_PATH = os.path.join(_currpath, "Data", "pretrained.pt")
