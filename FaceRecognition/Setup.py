@@ -15,7 +15,7 @@ class RestrictedVersion(Exception):
 
 
 def checkCuda():
-	allowedCudaVersions = [101, 100, 92, 90, 80]
+	allowedCudaVersions = [101, 100, 92, 91, 90, 80]
 
 	print("Checking CUDA ...")
 
@@ -62,16 +62,21 @@ def getMXNetVersion():
 	return mxnet_
 
 
-def downloadFile(url, filename):
+def downloadFile(url, filename, proxy=None):
 	def showProgress(count, blockSize, totalSize):
 		print("\rDownloading progress {:.2f}%".format(count * blockSize * 100 / totalSize), end="")
+
+	if proxy is not None:
+		proxy = urllib.request.ProxyHandler({"http": proxy})
+		opener = urllib.request.build_opener(proxy)
+		urllib.request.install_opener(opener)
 
 	urllib.request.urlretrieve(url, filename, showProgress)
 
 
-def downloadWeights():
+def downloadWeights(proxy=None):
 	folder = os.path.join(_curPath, "Data")
-	filename = "face_recognition_model-00004.params"
+	filename = "face_recognition_model-0000456.params"
 
 	print("\nModel weights will be downloaded. Proceed? (y/n)")
 	answer = requireAnswer()
@@ -86,13 +91,25 @@ def downloadWeights():
 	print("Downloading model weights ...")
 
 	try:
-		downloadFile(url, os.path.join(folder, filename))
+		downloadFile(url, os.path.join(folder, filename), proxy)
 
 	except Exception as e:
 		print("Weights downloading error:\n" + str(e))
 		return
 
 	print(f"\nModel weights '{filename}' has been successfully placed in {folder}")
+
+
+def setProxy():
+	proxy = "http://proxy.dvfu.ru:3128"
+
+	print(f"\nSet proxy {proxy}? (y/n)")
+	answer = requireAnswer()
+
+	if answer in ["y", "yes"]:
+		return proxy
+	elif answer in ["n", "no"]:
+		return
 
 
 def setup():
@@ -103,10 +120,12 @@ def setup():
 
 	mxnet_ = getMXNetVersion()
 
-	if mxnet_ is not None:
-		installPackage(pip, mxnet_, installedPackages, winPackages)
+	proxy = setProxy()
 
-	downloadWeights()
+	if mxnet_ is not None:
+		installPackage(pip, mxnet_, installedPackages, winPackages, proxy=proxy)
+
+	downloadWeights(proxy)
 
 
 if __name__ == "__main__":
