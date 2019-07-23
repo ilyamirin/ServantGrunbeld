@@ -11,8 +11,10 @@ class Message:
     BOT_ANSWER = 5
     ROBOVOICE = 6
     RECOGNIZED_SPEECH_PART = 7
+    MSG_TYPE_MUTE = 8
+    MSG_TYPE_UNMUTE = 9
 
-    def __init__(self, timestamp=None, type_=None, data=None, device_id=None):
+    def __init__(self, timestamp=None, type_=None, data=None, device_id="anon"):
         self.type = type_
         self.data = data
         self.timestamp = timestamp if timestamp else time.time()
