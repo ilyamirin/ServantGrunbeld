@@ -13,6 +13,7 @@ import numpy as np
 import sys
 import time
 from PIL import Image, ImageDraw, ImageFont
+from ProjectUtils.Renderers import OpenCVRenderer as renderer
 
 
 pygame.init()
@@ -22,14 +23,11 @@ frames_to_display = Queue(maxsize=CFG.FRAMES_QUEUE_MAX_LEN)
 speech_ignored = False
 current_phrase, last_recognized_phrase = "", ""
 dialogue_you_bot = []
+last_face_recognition_res = None
 
 
 async def recv_frame():
     return None
-
-
-async def recv_face_roi():
-    await None
 
 
 async def recv_user_request():
@@ -112,6 +110,11 @@ async def handle_message(server, ws_msg):
         if message.type == Message.MSG_TYPE_MUTE:
             global speech_ignored
             speech_ignored = True
+
+        if message.type == Message.RECOGNIZED_FACE_ROI:
+            global last_face_recognition_res
+            last_face_recognition_res = message.data
+
     elif ws_msg.type == aiohttp.WSMsgType.ERROR:
         print("ws connection closed with exception %s" % server.exception())
 
@@ -121,6 +124,7 @@ async def reconnect():
     async with aiohttp.ClientSession() as session, session.ws_connect(CFG.MGR_WS_URI) as mgr:
         print("connected", flush=True)
         await asyncio.gather(
+            mgr.send_bytes(Message(type_=Message.SUBSCRIBE, data=Message.RECOGNIZED_FACE_ROI).dumps()),
             mgr.send_bytes(Message(type_=Message.SUBSCRIBE, data=Message.MSG_TYPE_MUTE).dumps()),
             mgr.send_bytes(Message(type_=Message.SUBSCRIBE, data=Message.RECOGNIZED_SPEECH).dumps()),
             mgr.send_bytes(Message(type_=Message.SUBSCRIBE, data=Message.RECOGNIZED_SPEECH_PART).dumps()),
@@ -150,9 +154,9 @@ async def cam():
         try:
             frame = frames_to_display.get_nowait()
             radius, color, (height, width, _) = 25, (0, 0, 255) if speech_ignored else (0, 255, 0), frame.shape
-            frame = cv2.circle(frame, (width - radius, radius), radius, color, thickness=-1)
 
             font_size, font_face, font_scale, text_thick = 16, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 1, 3
+
             text_field = Image.new("RGB", (width*3//2, height), (255, 255, 255))
             draw = ImageDraw.Draw(text_field)
             unicode_font = ImageFont.truetype("DejaVuSans.ttf", font_size)
@@ -162,8 +166,12 @@ async def cam():
                 draw.text((0, newlines*font_size), y, font=unicode_font, fill=(0, 0, 255))
                 draw.text((0, (newlines + 1) * font_size), b, font=unicode_font, fill=(255, 0, 0))
                 newlines += 2 + b.count('\n')
-
             text_field = np.array(text_field)
+            text_field = cv2.circle(text_field, (text_field.shape[1] - radius, radius), radius, color, thickness=-1)
+
+            if last_face_recognition_res:
+                faces, boxes, landmarks = last_face_recognition_res
+                frame = renderer.drawBoxes(frame, boxes, text="", adaptiveToImage=True, occurrence="outer", fillTextBox=False)
 
             frame = np.concatenate((frame, text_field), axis=1)
             cv2.imshow(CFG.WINDOW_NAME, frame)

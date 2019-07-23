@@ -47,6 +47,7 @@ message_type_handlers = {
     Message.SUBSCRIBE: [handle_subscribe_intent],
     Message.MSG_TYPE_MUTE: [handle_mute_intent, transfer_to_subscribers],
     Message.MSG_TYPE_UNMUTE: [handle_mute_intent, transfer_to_subscribers],
+    Message.RECOGNIZED_FACE_ROI: [transfer_to_subscribers],
 }
 
 
