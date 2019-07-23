@@ -84,7 +84,7 @@ class Identifier(SpeakerIdentifier):
 		return " ".join(name)
 
 
-	def enroll(self, name, vector):
+	def enroll(self, vector, name):
 		assert self.dataBase is not None
 
 		name = self._checkIncomingName(name)
@@ -105,7 +105,7 @@ class Identifier(SpeakerIdentifier):
 		self.enrollFromFile(audio, name)
 
 
-	def enrollFromFolder(self, name, folder):
+	def enrollFromFolder(self, folder, name):
 		files = [f for f in os.listdir(folder) if f.lower().endswith(".wav")]
 
 		vector = []

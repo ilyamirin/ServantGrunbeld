@@ -1,6 +1,6 @@
 import socket
 import pickle
-from struct import pack, unpack
+from struct import pack, unpack, error
 
 from . import Tasks
 from SpeechIdentification.PytorchIdentification import Identifier
@@ -19,7 +19,7 @@ class IdentifierServer(Identifier):
 		self.running = False
 
 
-	def _getRequest(self, clientSocket):
+	def _getRequest(self, clientSocket, clientAddress):
 		request = clientSocket.recv(8)
 		length = unpack(">Q", request)
 
@@ -27,8 +27,7 @@ class IdentifierServer(Identifier):
 		while len(request) < length[0]:
 			request += clientSocket.recv(self.chunkSize)
 
-		print("Received request from client {}, unpickling it".
-		      format(":".join(str(i) for i in (clientSocket.getsockname()))))
+		print(f"Received request from client {clientAddress}, unpickling it")
 
 		request = pickle.loads(request)
 
@@ -86,7 +85,7 @@ class IdentifierServer(Identifier):
 
 		print("Server running at {}".format(":".join(str(i) for i in (self.socket.getsockname()))))
 		while self.running:
-			self.socket.settimeout(1)
+			# self.socket.settimeout(1)
 
 			try:
 				clientSocket, clientAddress = self.socket.accept()
@@ -94,25 +93,40 @@ class IdentifierServer(Identifier):
 				clientSocket = None
 
 			if clientSocket:
-				try:
-					request = self._getRequest(clientSocket)
+				clientAddressString = ":".join((str(i) for i in clientAddress))
+				print(f"Connection with {clientAddressString} is established")
 
-					results = self.handleRequest(request)
-
-					response = {
-						"status": 200,
-						"results": results
-					}
-
-				except Exception as e:
-					response = {
-						"status": 500,
-						"message": e
-					}
-
-				finally:
+				opened = True
+				while opened:
 					try:
-						response = self._packResponse(response)
-						clientSocket.sendall(response)
+						request = self._getRequest(clientSocket, clientAddressString)
+
+						results = self.handleRequest(request)
+
+						response = {
+							"status": 200,
+							"results": results
+						}
+
+					except ConnectionAbortedError:
+						opened = False
+						clientSocket.close()
+
 					except Exception as e:
-						print(e)
+						response = {
+							"status": 500,
+							"message": e
+						}
+
+					finally:
+						try:
+							if clientSocket._closed:
+								break
+
+							response = self._packResponse(response)
+							clientSocket.sendall(response)
+
+							print(f"Response has been sent to {clientAddressString}")
+
+						except Exception as e:
+							print(e)

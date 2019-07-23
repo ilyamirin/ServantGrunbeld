@@ -2,9 +2,11 @@ import os
 import socket
 import pickle
 import string
-from struct import pack, unpack
 
 import numpy as np
+
+from io import BytesIO
+from struct import pack, unpack
 
 from numpy.linalg import norm
 
@@ -17,9 +19,18 @@ class IdentifierClient:
 		self.microphone = MicrophoneRecorder()
 
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.socket.connect(address)
+		self.address = address
 
 		self.chunkSize = chunkSize
+
+
+	def __enter__(self):
+		self.socket.connect(self.address)
+		return self
+
+
+	def __exit__(self, type_, val, tb):
+		self.socket.close()
 
 
 	def _handleResponse(self, response):
@@ -81,7 +92,7 @@ class IdentifierClient:
 
 	def _getEmbeddingFromFile(self, file):
 		with open(file, "rb") as file:
-			audio = file.read()
+			audio = BytesIO(file.read())
 
 		request = {
 			"task": Tasks._getEmbeddingFromFile,
@@ -129,7 +140,7 @@ class IdentifierClient:
 		return " ".join(name)
 
 
-	def enroll(self, name, vector):
+	def enroll(self, vector, name):
 		request = {
 			"task": Tasks.enroll,
 			"name": name,
@@ -164,7 +175,7 @@ class IdentifierClient:
 
 	def enrollFromFile(self, file, name):
 		with open(file, "rb") as file:
-			audio = file.read()
+			audio = BytesIO(file.read())
 
 		request = {
 			"task": Tasks.enrollFromFile,
@@ -180,14 +191,14 @@ class IdentifierClient:
 		self._handleResponse(response)
 
 
-	def enrollFromFolder(self, name, folder):
+	def enrollFromFolder(self, folder, name):
 		files = [f for f in os.listdir(folder) if f.lower().endswith(".wav")]
 
 		vector = []
 		for file in files:
 			embedding = self._getEmbeddingFromFile(os.path.join(folder, file))
 
-			if embedding:
+			if embedding is not None:
 				vector.append(embedding)
 
 		vector = np.average(vector, axis=0)
@@ -218,8 +229,6 @@ class IdentifierClient:
 
 
 	def identifyViaFile(self, filepath, unknownThreshold=0.3):
-		from io import BytesIO
-
 		with open(filepath, "rb") as file:
 			audio = BytesIO(file.read())
 
