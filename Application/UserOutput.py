@@ -23,7 +23,7 @@ frames_to_display = Queue(maxsize=CFG.FRAMES_QUEUE_MAX_LEN)
 speech_ignored = False
 current_phrase, last_recognized_phrase = "", ""
 dialogue_you_bot = []
-last_face_recognition_res = None
+last_boxes_users = None
 
 
 async def recv_frame():
@@ -112,8 +112,8 @@ async def handle_message(server, ws_msg):
             speech_ignored = True
 
         if message.type == Message.RECOGNIZED_FACE_ROI:
-            global last_face_recognition_res
-            last_face_recognition_res = message.data
+            global last_boxes_users
+            last_boxes_users = message.data
 
     elif ws_msg.type == aiohttp.WSMsgType.ERROR:
         print("ws connection closed with exception %s" % server.exception())
@@ -169,9 +169,9 @@ async def cam():
             text_field = np.array(text_field)
             text_field = cv2.circle(text_field, (text_field.shape[1] - radius, radius), radius, color, thickness=-1)
 
-            if last_face_recognition_res:
-                faces, boxes, landmarks = last_face_recognition_res
-                frame = renderer.drawBoxes(frame, boxes, text="", adaptiveToImage=True, occurrence="outer", fillTextBox=False)
+            if last_boxes_users:
+                boxes, users = last_boxes_users
+                frame = renderer.drawBoxes(frame, boxes, text=users, adaptiveToImage=True, occurrence="outer", fillTextBox=False)
 
             frame = np.concatenate((frame, text_field), axis=1)
             cv2.imshow(CFG.WINDOW_NAME, frame)

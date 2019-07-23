@@ -7,6 +7,7 @@ except ModuleNotFoundError:
 from FaceRecognition.InsightFaceRecognition import FaceRecognizer, DataBase, RetinaFace, DetectorConfig, RecognizerConfig
 import aiohttp
 import asyncio
+import time
 
 dataBase = DataBase(
     filepath="./FaceRecognitionData/Temp/users_face_exp.hdf"
@@ -34,9 +35,17 @@ async def main():
             async for ws_msg in mgr:
                 if ws_msg.type == aiohttp.WSMsgType.BINARY:
                     input_message: Message = Message.loads(ws_msg.data)
+                    if time.time() - input_message.timestamp > 1/CFG.FPS:
+                        continue
                     if input_message.type == Message.VIDEO_FRAME:
+                        faces, boxes, landmarks = recognizer.detectFaces(input_message.data)
+                        embeddings = [recognizer._getEmbedding(face) for face in faces]
+                        users = []
+                        for embed in embeddings:
+                            result, scores = recognizer.identify(embed)
+                            users.append(result)
                         output_message = Message(
-                            data=recognizer.detectFaces(input_message.data),
+                            data=(boxes, users),
                             type_=Message.RECOGNIZED_FACE_ROI,
                             device_id=input_message.device_id
                         )

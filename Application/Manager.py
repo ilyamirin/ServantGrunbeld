@@ -11,6 +11,7 @@ from aiohttp import web
 subscribers = {}
 muted_msg_types = set()
 loop = asyncio.get_event_loop()
+greeted_clients = set()
 
 
 async def transfer_to_subscribers(client, message: Message):
@@ -38,6 +39,13 @@ async def handle_mute_intent(client, message: Message):
         print(f"Messages {message.data} on {message.device_id} is unmuted", flush=True)
 
 
+async def handle_new_face(client, message):
+    for name in message.data[1]:
+        if name not in greeted_clients:
+            greeted_clients.add(name)
+            await transfer_to_subscribers(client, Message(data=f"Привет, {name}", type_=Message.BOT_ANSWER))
+
+
 message_type_handlers = {
     Message.BOT_ANSWER: [transfer_to_subscribers],
     Message.AUDIO_CHUNK: [transfer_to_subscribers],
@@ -47,7 +55,7 @@ message_type_handlers = {
     Message.SUBSCRIBE: [handle_subscribe_intent],
     Message.MSG_TYPE_MUTE: [handle_mute_intent, transfer_to_subscribers],
     Message.MSG_TYPE_UNMUTE: [handle_mute_intent, transfer_to_subscribers],
-    Message.RECOGNIZED_FACE_ROI: [transfer_to_subscribers],
+    Message.RECOGNIZED_FACE_ROI: [transfer_to_subscribers, handle_new_face],
 }
 
 
