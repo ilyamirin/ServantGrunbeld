@@ -9,8 +9,10 @@ import aiohttp
 import cv2
 from queue import Queue, Empty, Full
 import pygame
+import numpy as np
 import sys
 import time
+from PIL import Image, ImageDraw, ImageFont
 
 
 pygame.init()
@@ -18,6 +20,8 @@ mixer = pygame.mixer
 mixer.init(channels=1)
 frames_to_display = Queue(maxsize=CFG.FRAMES_QUEUE_MAX_LEN)
 speech_ignored = False
+current_phrase, last_recognized_phrase = "", ""
+dialogue_you_bot = []
 
 
 async def recv_frame():
@@ -49,7 +53,7 @@ def play_robovoice(audio_bytes):
     sound.play()
 
 
-async def display_frame(message: Message):
+def add_frame_to_queue(message: Message):
     frame = message.data
     try:
         frames_to_display.put_nowait(frame)
@@ -69,25 +73,42 @@ async def ignore_speech_while_and_then(func, afunc=None):
     asyncio.get_event_loop().create_task(unset_when_not_func())
 
 
+async def handle_bot_answer(server, message: Message):
+    voice = await synthesize_voice(message.data)
+    play_robovoice(voice)
+    asyncio.get_event_loop().create_task(ignore_speech_while_and_then(
+        mixer.get_busy,
+        afunc=server.send_bytes(Message(type_=Message.MSG_TYPE_UNMUTE, data=Message.AUDIO_CHUNK).dumps())
+    ))
+
+
 async def handle_message(server, ws_msg):
     if ws_msg.type == aiohttp.WSMsgType.BINARY:
         message: Message = Message.loads(ws_msg.data)
+
         if message.type == Message.VIDEO_FRAME:
-            await display_frame(message)
+            add_frame_to_queue(message)
+
         if message.type == Message.RECOGNIZED_SPEECH_PART:
-            print(message.data.strip(), end="\n" if message.data.strip() else "")
+            global current_phrase
+            current_phrase = message.data.strip()
+            if current_phrase:
+                print(current_phrase)
+
         if message.type == Message.RECOGNIZED_SPEECH:
             if message.data.strip() != "":
+                global last_recognized_phrase
                 prefix = "" if message.type == Message.RECOGNIZED_SPEECH_PART else "Y:"
-                print(prefix, message.data, flush=True)
+                current_phrase = last_recognized_phrase = message.data.strip()
+                print(prefix, last_recognized_phrase, flush=True)
+
         if message.type == Message.BOT_ANSWER and not mixer.get_busy():
+            dialogue_you_bot.append((last_recognized_phrase, message.data))
+            if len(dialogue_you_bot) > 10:
+                dialogue_you_bot.pop(0)
             print("B:", message.data, flush=True)
-            voice = await synthesize_voice(message.data)
-            play_robovoice(voice)
-            asyncio.get_event_loop().create_task(ignore_speech_while_and_then(
-                mixer.get_busy,
-                afunc=server.send_bytes(Message(type_=Message.MSG_TYPE_UNMUTE, data=Message.AUDIO_CHUNK).dumps())
-            ))
+            asyncio.get_event_loop().create_task(handle_bot_answer(server, message))
+
         if message.type == Message.MSG_TYPE_MUTE:
             global speech_ignored
             speech_ignored = True
@@ -130,15 +151,31 @@ async def cam():
             frame = frames_to_display.get_nowait()
             radius, color, (height, width, _) = 25, (0, 0, 255) if speech_ignored else (0, 255, 0), frame.shape
             frame = cv2.circle(frame, (width - radius, radius), radius, color, thickness=-1)
+
+            font_size, font_face, font_scale, text_thick = 16, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 1, 3
+            text_field = Image.new("RGB", (width*3//2, height), (255, 255, 255))
+            draw = ImageDraw.Draw(text_field)
+            unicode_font = ImageFont.truetype("DejaVuSans.ttf", font_size)
+            draw.text((0, height - 3*font_size//2), current_phrase, font=unicode_font, fill=(0, 0, 0))
+            newlines = 0
+            for y, b in dialogue_you_bot:
+                draw.text((0, newlines*font_size), y, font=unicode_font, fill=(0, 0, 255))
+                draw.text((0, (newlines + 1) * font_size), b, font=unicode_font, fill=(255, 0, 0))
+                newlines += 2 + b.count('\n')
+
+            text_field = np.array(text_field)
+
+            frame = np.concatenate((frame, text_field), axis=1)
             cv2.imshow(CFG.WINDOW_NAME, frame)
             cv2.waitKey(1)
         except Empty:
             pass
         except Exception as e:
             print(f"Unexpected exception: {e}", flush=True)
-        await asyncio.sleep(1/(2*CFG.FPS))
+        await asyncio.sleep(1/(4*CFG.FPS))
 
-
+cv2.namedWindow(CFG.WINDOW_NAME, cv2.WINDOW_NORMAL)
+cv2.resizeWindow(CFG.WINDOW_NAME, *[256*x for x in ((4 + 4*3//2), 3)])
 try:
     asyncio.get_event_loop().run_until_complete(asyncio.gather(main(), cam()))
 except KeyboardInterrupt:

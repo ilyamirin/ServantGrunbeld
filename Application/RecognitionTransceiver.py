@@ -17,16 +17,20 @@ speech_ignored = False
 
 
 async def listen_recognizer(server):
+    prev = ""
     while True:
         data = await asyncio.get_event_loop().run_in_executor(thread_pool_executor, rec.recv)
         tp = Message.RECOGNIZED_SPEECH if b'\n' in data else Message.RECOGNIZED_SPEECH_PART
         txt = data.decode().strip()
+        txt = prev if tp == Message.RECOGNIZED_SPEECH and not txt else txt
         if txt:
+            prev = txt
             await server.send_bytes(Message(data=txt, type_=tp).dumps())
             print("Y:" if tp == Message.RECOGNIZED_SPEECH else "", txt, flush=True)
             if tp == Message.RECOGNIZED_SPEECH:
                 global speech_ignored
                 speech_ignored = True
+                prev = ""
                 asyncio.get_event_loop().create_task(
                     server.send_bytes(Message(type_=Message.MSG_TYPE_MUTE, data=Message.AUDIO_CHUNK).dumps())
                 )
