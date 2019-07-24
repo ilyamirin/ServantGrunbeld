@@ -4,7 +4,7 @@ import os
 class IdentifierConfig:
 	_currpath = os.path.dirname(os.path.abspath(__file__))
 
-	MODEL_PATH = os.path.join(_currpath, "Data", "pretrained.pt")
+	MODEL_PATH = os.path.join(_currpath, "Data", "speaker_identification_model.pt")
 
 
 class ModelConfigPytorch:

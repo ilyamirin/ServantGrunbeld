@@ -25,13 +25,17 @@ def checkPIP():
 def installPackage(pip, package, installedPackages, manualList, **options):
 	version = options.get("version", None)
 	proxy = options.get("proxy", None)
+	url = options.get("url", None)
 
 	package = package if version is None else "{}=={}".format(package, version)
 
 	if proxy is None:
-		command = (pip, "install", package)
+		command = [pip, "install", package]
 	else:
-		command = (pip, "install", "--proxy", proxy, package)
+		command = [pip, "install", "--proxy", proxy, package]
+
+	if url:
+		command[-1] = url
 
 	if not package in installedPackages:
 		if "linux" in sys.platform or (sys.platform == "win32" and package not in manualList):

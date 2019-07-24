@@ -19,7 +19,7 @@ except ImportError:
 	from Identification import SpeakerIdentifier
 	from AudioPreprocessing import preprocess_file
 	from Model import SpeakerEncoder
-	from Config import RecognizerConfig
+	from Config import IdentifierConfig
 
 
 class Identifier(SpeakerIdentifier):
