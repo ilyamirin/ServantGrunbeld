@@ -79,7 +79,8 @@ class FaceRecognizer:
 		return "/".join(name)
 
 
-	def _checkOutgoingName(self, name):
+	@staticmethod
+	def _checkOutgoingName(name):
 		name = name.split("/")
 
 		if name[-1] in string.digits:
@@ -204,7 +205,7 @@ class FaceRecognizer:
 			result = name if (score < minScore and score < unknownThreshold) else result
 			minScore = score if score < minScore else minScore
 
-		result = self._checkOutgouingName(result)
+		result = self._checkOutgoingName(result)
 
 		return result, scores
 
