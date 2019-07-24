@@ -60,34 +60,37 @@ class MicrophoneRecorder:
 		return max(soundData) < self.silenceThreshold
 
 
-	def _normalize(self, soundData):
+	@staticmethod
+	def normalize(soundData, maximum):
 		if len(soundData) == 0:
 			print("Warning! Record is empty")
 			return soundData
 
-		ratios = float(self.maximum) / max(abs(i) for i in soundData)
+		ratios = float(maximum) / max(abs(i) for i in soundData)
 
 		soundData = [int(i * ratios) for i in soundData]
 
 		return soundData
 
 
-	def _trim(self, soundData):
+	@staticmethod
+	def _trimSide(soundData, threshold):
 		for idx, value in enumerate(soundData):
-			if abs(value) > self.silenceThreshold:
+			if abs(value) > threshold:
 				soundData = soundData[idx:]
 				break
 
 		return soundData
 
 
-	def _trimWrapper(self, soundData):
+	@staticmethod
+	def trim(soundData, threshold):
 		# Trim to the left
-		soundData = self._trim(soundData)
+		soundData = MicrophoneRecorder._trimSide(soundData, threshold)
 
 		# Trim to the right
 		soundData.reverse()
-		soundData = self._trim(soundData)
+		soundData = MicrophoneRecorder._trimSide(soundData, threshold)
 		soundData.reverse()
 
 		return soundData
@@ -160,11 +163,11 @@ class MicrophoneRecorder:
 		stream.stop_stream()
 		stream.close()
 
-		record = self._normalize(record) if normalize else record
-		record = self._trimWrapper(record) if trim else record
+		record = self.normalize(record, self.maximum) if normalize else record
+		record = self.trim(record, self.silenceThreshold) if trim else record
 		record = self._addSilence(record, 0.5) if addSilence else record
 
-		wav = self.convertToWAVFile(sampleWidth, record)
+		wav = self.convertToWAVFile(record, sampleWidth, self.rate)
 
 		if toFile:
 			self.recordToFile(wav, wpath, fileName)
@@ -193,11 +196,11 @@ class MicrophoneRecorder:
 		stream.stop_stream()
 		stream.close()
 
-		record = self._normalize(record) if normalize else record
-		record = self._trimWrapper(record) if trim else record
+		record = self.normalize(record, self.maximum) if normalize else record
+		record = self.trim(record, self.silenceThreshold) if trim else record
 		record = self._addSilence(record, 0.5) if addSilence else record
 
-		wav = self.convertToWAVFile(sampleWidth, record)
+		wav = self.convertToWAVFile(record, sampleWidth, self.rate)
 
 		if toFile:
 			self.recordToFile(wav, wpath, fileName)
@@ -207,7 +210,8 @@ class MicrophoneRecorder:
 		return wav
 
 
-	def convertToWAVFile(self, width, data):
+	@staticmethod
+	def convertToWAVFile(data, width, rate):
 		tempFile = io.BytesIO()
 
 		data = pack("<" + ("h" * len(data)), *data)
@@ -215,7 +219,7 @@ class MicrophoneRecorder:
 		with wave.open(tempFile, "wb") as tempInput:
 			tempInput.setnchannels(1)
 			tempInput.setsampwidth(width)
-			tempInput.setframerate(self.rate)
+			tempInput.setframerate(rate)
 			tempInput.writeframes(data)
 
 		tempFile.seek(0)
