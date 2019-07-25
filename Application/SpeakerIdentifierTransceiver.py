@@ -15,7 +15,7 @@ from ProjectUtils.Microphone import MicrophoneRecorder
 
 
 dataBase = DataBase(
-    filepath=r"/home/anothername/projects/ServantGrunbeld/SpeechIdentification/Data/users_new_base.hdf"
+    filepath=IdentifierConfig.DATA_BASE_PATH
 )
 
 identifier = Identifier(
@@ -54,10 +54,10 @@ async def main():
                                 continue
 
                             voice = MicrophoneRecorder.convertToWAVFile(voice, 2, 16000)
-                            name, _ = identifier.identifyViaFile(voice)
+                            name, _ = identifier.identifyViaFile(voice, unknownThreshold=0.25)
 
                             voice = array("h")
-                            print(f"\r{name}", end="")
+                            print(name)
 
                             output_message = Message(
                                 data=name,
