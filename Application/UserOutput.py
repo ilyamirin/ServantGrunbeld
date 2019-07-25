@@ -151,11 +151,15 @@ async def render(mgr):
             draw = ImageDraw.Draw(text_field)
             unicode_font = ImageFont.truetype("DejaVuSans.ttf", font_size)
             draw.text((0, height - 3*font_size//2), current_phrase, font=unicode_font, fill=(0, 0, 0))
-            newlines = 0
+            lines = []
             for y, b in dialogue_you_bot:
-                draw.text((0, newlines*font_size), y, font=unicode_font, fill=(0, 0, 255))
-                draw.text((0, (newlines + 1) * font_size), b, font=unicode_font, fill=(255, 0, 0))
-                newlines += 2 + b.count('\n')
+                lines.append(['you', y])
+                lines.extend(['bot', line] for line in b.split('\n'))
+            newlines = 0
+            for who, line in lines[-20:]:
+                line_color = (0, 0, 255) if who == 'you' else (255, 0, 0)
+                draw.text((0, newlines * (font_size + 1)), line, font=unicode_font, fill=line_color)
+                newlines += 1
             text_field = np.array(text_field)
             text_field = cv2.circle(text_field, (text_field.shape[1] - radius, radius), radius, color, thickness=-1)
 
