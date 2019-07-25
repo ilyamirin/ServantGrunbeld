@@ -15,7 +15,7 @@ from ProjectUtils.Microphone import MicrophoneRecorder
 
 
 dataBase = DataBase(
-    filepath=r"D:\git_projects\FEFU\PipeleneDraft\SpeechIdentification\Temp\users_new_base.hdf"
+    filepath=r"/home/anothername/projects/ServantGrunbeld/SpeechIdentification/Data/users_new_base.hdf"
 )
 
 identifier = Identifier(
@@ -25,7 +25,7 @@ identifier = Identifier(
 
 voice = array("h")
 rate = 16000
-sec_threshold = 1
+sec_threshold = 2
 
 async def main():
     global voice

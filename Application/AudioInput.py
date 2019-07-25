@@ -34,7 +34,8 @@ async def send_chunks(mgr):
 
 
 async def main():
-    silence = b"\0" * mic.rate * 2 * 2
+    #silence = b"\0" * mic.rate * 2 * 2 * 2
+    silence = open("silence", "rb").read()
     try:
         print("Trying to connect...", end=' ', flush=True)
         async with aiohttp.ClientSession() as session, session.ws_connect(CFG.MGR_WS_URI) as mgr:
@@ -50,6 +51,7 @@ async def main():
                     input_message = Message.loads(ws_msg.data)
                     if input_message.type == Message.MIC_START and not mic_started:
                         # mic.startStream(streamCallback)
+                        print("mic started")
                         mic_started = True
                     if input_message.type == Message.MIC_STOP and mic_started:
                         # mic.stopStream()

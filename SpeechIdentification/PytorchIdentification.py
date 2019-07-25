@@ -33,7 +33,11 @@ class Identifier(SpeakerIdentifier):
 
 
 	def _initEmbedder(self, modelpath):
-		net = SpeakerEncoder(self.device, torch.device("cpu"))
+		try:
+			net = SpeakerEncoder(self.device, torch.device("cpu"))
+		except:
+			net = SpeakerEncoder(self.device, torch.device("cpu"))
+
 		checkpoint = torch.load(modelpath)
 
 		if modelpath.endswith(".pt"):

@@ -85,7 +85,7 @@ async def handle_message(server, ws_msg):
                 current_phrase = last_recognized_phrase = message.data.strip()
                 print(prefix, last_recognized_phrase, flush=True)
 
-        if message.type == Message.BOT_ANSWER and not mixer.get_busy():
+        if message.type == Message.BOT_ANSWER:
             dialogue_you_bot.append((last_recognized_phrase, message.data))
             if len(dialogue_you_bot) > 10:
                 dialogue_you_bot.pop(0)
@@ -174,6 +174,8 @@ async def render(mgr):
                 last_keydown = time.time()
             if not mic_started and key == ord(' '):
                 mic_started = True
+                if mixer.get_busy():
+                    mixer.stop()
                 asyncio.get_event_loop().create_task(mgr.send_bytes(Message(type_=Message.MIC_START, data="").dumps()))
             d = time.time() - last_keydown
             if mic_started and key == -1:
