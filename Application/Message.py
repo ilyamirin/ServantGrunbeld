@@ -13,6 +13,8 @@ class Message:
     RECOGNIZED_SPEECH_PART = 7
     MSG_TYPE_MUTE = 8
     MSG_TYPE_UNMUTE = 9
+    MIC_START = 10
+    MIC_STOP = 11
 
     def __init__(self, timestamp=None, type_=None, data=None, device_id="anon"):
         self.type = type_

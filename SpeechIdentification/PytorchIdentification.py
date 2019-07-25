@@ -34,6 +34,7 @@ class Identifier(SpeakerIdentifier):
 
 	def _initEmbedder(self, modelpath):
 		# следующие строки - необходимая дичь для работы куды 9 на картах RTX 20XX
+
 		try:
 			net = SpeakerEncoder(self.device, torch.device("cpu"))
 		except:

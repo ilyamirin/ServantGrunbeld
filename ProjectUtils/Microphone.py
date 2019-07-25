@@ -274,6 +274,7 @@ class MicrophoneRecorder:
 	def stopStream(self):
 		self.mic_stream.stop_stream()
 		self.mic_stream.close()
+		self.pipeIsOpened = False
 
 
 def inputThread(aList):

@@ -56,6 +56,8 @@ message_type_handlers = {
     Message.MSG_TYPE_MUTE: [handle_mute_intent, transfer_to_subscribers],
     Message.MSG_TYPE_UNMUTE: [handle_mute_intent, transfer_to_subscribers],
     Message.RECOGNIZED_FACE_ROI: [transfer_to_subscribers, handle_new_face],
+    Message.MIC_START: [transfer_to_subscribers],
+    Message.MIC_STOP: [transfer_to_subscribers],
 }
 
 
