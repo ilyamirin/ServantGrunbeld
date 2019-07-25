@@ -11,7 +11,7 @@ from aiohttp import web
 subscribers = {}
 muted_msg_types = set()
 loop = asyncio.get_event_loop()
-greeted_clients = set()
+greeted_clients = {"Unknown"}
 
 
 async def transfer_to_subscribers(client, message: Message):
