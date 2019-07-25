@@ -1,4 +1,5 @@
 *
 !.gitignore
+!data_base_faces.hdf
 !weightsURL.txt
 !face_recognition_model-symbol.json

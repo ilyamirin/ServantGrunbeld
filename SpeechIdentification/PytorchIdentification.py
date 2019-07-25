@@ -33,7 +33,12 @@ class Identifier(SpeakerIdentifier):
 
 
 	def _initEmbedder(self, modelpath):
-		net = SpeakerEncoder(self.device, torch.device("cpu"))
+		# следующие строки - необходимая дичь для работы куды 9 на картах RTX 20XX
+		try:
+			net = SpeakerEncoder(self.device, torch.device("cpu"))
+		except:
+			net = SpeakerEncoder(self.device, torch.device("cpu"))
+
 		checkpoint = torch.load(modelpath)
 
 		if modelpath.endswith(".pt"):
@@ -116,7 +121,7 @@ class Identifier(SpeakerIdentifier):
 
 		vector = np.average(vector, axis=0)
 
-		self.enroll(name, vector)
+		self.enroll(vector, name)
 
 
 	def identify(self, vector, unknownThreshold=0.3):
@@ -160,7 +165,7 @@ class Identifier(SpeakerIdentifier):
 
 def enroll(embedder:Identifier, userDict):
 	for name, folder in userDict.items():
-		embedder.enrollFromFolder(name, folder)
+		embedder.enrollFromFolder(folder, name)
 
 
 def identify(embedder:Identifier, userDict):
@@ -176,7 +181,7 @@ def enrollAuto(embedder:Identifier, usersPath):
 		name = usrFolder.split("_")[0]
 		enrFolder = os.path.join(usersPath, usrFolder, "enr")
 
-		embedder.enrollFromFolder(name, enrFolder)
+		embedder.enrollFromFolder(enrFolder, name)
 
 
 def identifyAuto(embedder:Identifier, usersPath):
@@ -206,7 +211,7 @@ def main():
 	}
 
 	dataBase = DataBase(
-		filepath=r"./Temp/users_base.hdf",
+		filepath=IdentifierConfig.DATA_BASE_PATH,
 		showBase=True
 	)
 
@@ -215,11 +220,11 @@ def main():
 		dataBase=dataBase
 	)
 
-	# enrollAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
-	# identifyAuto(embedder, r"D:\data\Speech\Voices_audio\MySets")
+	enrollAuto(embedder, r"D:\data\Speech\Voices_audio\Demo")
+	identifyAuto(embedder, r"D:\data\Speech\Voices_audio\Demo")
 
-	result, _ = embedder.identifyViaMicrophone()
-	print(result)
+	# result, _ = embedder.identifyViaMicrophone()
+	# print(result)
 
 	# enroll(embedder, usersEnr)
 	#

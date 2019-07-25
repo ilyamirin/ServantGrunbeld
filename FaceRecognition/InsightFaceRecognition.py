@@ -352,14 +352,19 @@ def identifyAuto(embedder:FaceRecognizer, usersPath):
 
 		for file in os.listdir(verFolder):
 			users = embedder.identifyViaImageFile(os.path.join(verFolder, file))
-			for usr in users:
+
+			for idx, usr in enumerate(users):
 				print("File {}\nTRUE {}\tPREDICTION {}\nscores: {}\n".format(file, name,
 				                                                             usr.get("name"), usr.get("scores")))
+				image = cv2.imread(os.path.join(verFolder, file))
+				renderer.drawBoxes(image, boxes=[usr.get("coords")], text=usr.get("name"))
+				# renderer.show(image)
+				renderer.save(image, r"D:\data\Faces\Results", "{}_{}".format(idx, file))
 
 
 def main():
 	dataBase = DataBase(
-		filepath="./Temp/users_face_exp.hdf"
+		filepath=RecognizerConfig.DATA_BASE_PATH
 	)
 
 	detector = RetinaFace(
@@ -374,14 +379,15 @@ def main():
 		detector=detector
 	)
 
-	# enrollAuto(recognizer, r"D:\data\Faces\Friends")
-	# identifyAuto(recognizer, r"D:\data\Faces\Friends")
+	# enrollAuto(recognizer, r"D:\data\Faces\Demo")
+	identifyAuto(recognizer, r"D:\data\Faces\Demo")
+	# recognizer.identifyViaImageFile(r"D:\data\Faces\Results\Unknown_1.png")
 	# recognizer.identifyViaVideoFile(filepath=r"D:\data\Faces\Friends\FRIENDS - Season 6 Intro A [HD].mp4")
 
 	# enroll(recognizer, usersEnroll)
 	# identify(recognizer, usersIdentify)
 	# recognizer.enrollFromCamera(0, "Anton", show=True)
-	recognizer.identifyViaCamera(0)
+	# recognizer.identifyViaCamera(0)
 	# recognizer.identifyViaVideoFile(r"D:\data\Faces\Demo.avi")
 
 

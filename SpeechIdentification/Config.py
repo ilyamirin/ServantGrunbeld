@@ -6,6 +6,8 @@ class IdentifierConfig:
 
 	MODEL_PATH = os.path.join(_currpath, "Data", "speaker_identification_model.pt")
 
+	DATA_BASE_PATH = os.path.join(_currpath, "Data", "data_base_voices.hdf")
+
 
 class ModelConfigPytorch:
 	## Model parameters
