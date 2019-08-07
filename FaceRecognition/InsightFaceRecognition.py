@@ -115,7 +115,7 @@ class FaceRecognizer:
 		return faces, boxes, landmarks
 
 
-	def enroll(self, name, vector):
+	def enroll(self, vector, name):
 		assert self.dataBase is not None
 
 		name = self._checkIncomingName(name)
@@ -127,7 +127,7 @@ class FaceRecognizer:
 	def enrollFromImageTensor(self, image, name):
 		embeddings, boxes, landmarks = self._processImageTensor(image, enrollment=True)
 
-		self.enroll(name, embeddings[0])
+		self.enroll(embeddings[0], name)
 
 		return boxes, landmarks
 
@@ -154,7 +154,7 @@ class FaceRecognizer:
 		videoStream(filepath, self._enrollVideoStream, name=name, container=container, show=show, windowName=windowName)
 
 		container = np.average(np.array(container), axis=0)
-		self.enroll(name, container)
+		self.enroll(container, name)
 
 		print("User {} has been enrolled".format(self._checkIncomingName(name)))
 
@@ -165,7 +165,7 @@ class FaceRecognizer:
 		                      windowName=windowName)
 
 		container = np.average(np.array(container), axis=0)
-		self.enroll(name, container)
+		self.enroll(container, name)
 
 		print("User {} has been enrolled".format(self._checkIncomingName(name)))
 
@@ -182,7 +182,7 @@ class FaceRecognizer:
 
 		vector = np.average(vector, axis=0)
 
-		self.enroll(name, vector)
+		self.enroll(vector, name)
 
 
 	def identify(self, vector, unknownThreshold=0.5):
