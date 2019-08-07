@@ -47,6 +47,8 @@ async def synthesize_voice(text):
 
 
 def play_robovoice(audio_bytes):
+    if mixer.get_busy():
+        mixer.stop()
     sound = mixer.Sound(buffer=audio_bytes)
     sound.play()
 
@@ -138,7 +140,6 @@ async def main():
 
 async def render(mgr):
     mic_started = False
-    keyup_cnt = 0
     last_keydown = time.time()
     while True:
         try:

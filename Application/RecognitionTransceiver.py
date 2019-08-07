@@ -20,8 +20,9 @@ async def listen_recognizer(server):
         data = await asyncio.get_event_loop().run_in_executor(thread_pool_executor, rec.recv)
         tp = Message.RECOGNIZED_SPEECH if b'4' in data else Message.RECOGNIZED_SPEECH_PART
         txt_debug = data.decode()
-        txt = data.decode().replace('1', '').replace('2', '').replace('3', '').replace('4', '').strip()
-        if txt:
+        # Гм, это можно сделать лучше
+        txt = data.decode().replace("1", "").replace("2", "").replace("3", "").replace("4", "").replace("гм", "").strip()
+        if txt and txt != "гм":
             await server.send_bytes(Message(data=txt, type_=tp).dumps())
             print("Y:" if tp == Message.RECOGNIZED_SPEECH else "", txt_debug, flush=True)
 
