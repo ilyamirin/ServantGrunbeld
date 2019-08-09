@@ -1,5 +1,4 @@
 import os
-import string
 import numpy as np
 import mxnet as mx
 import cv2
@@ -7,7 +6,8 @@ import cv2
 from numpy.linalg import norm
 
 from ProjectUtils.Renderers import OpenCVRenderer as renderer
-from ProjectUtils.DataBase import DataBase
+from DataBase.DataBaseHDF import DataBase as DBHDF
+from DataBase.DjangoAPIWrapper import DataBase as DBDjango
 from FaceDetection.RetinaFaceDetector import RetinaFace
 from FaceDetection.Config import DetectorConfig
 
@@ -24,7 +24,7 @@ class TooManyFaces(Exception):
 
 
 class FaceRecognizer:
-	def __init__(self, prefix, epoch, dataBase:DataBase, detector:RetinaFace, ctxID=0):
+	def __init__(self, prefix, epoch, dataBase, detector:RetinaFace, ctxID=0):
 		self.net = self._initEmbedder(prefix, epoch, ctxID)
 
 		self.dataBase = dataBase
@@ -70,25 +70,6 @@ class FaceRecognizer:
 		return embeddings, boxes, landmarks
 
 
-	def _checkIncomingName(self, name):
-		name = name.split("/")
-
-		if not name[-1] in string.digits and len(name) == 1:
-			name = [name[-1], str(len(self.dataBase.get("/".join(name), {})))]
-
-		return "/".join(name)
-
-
-	@staticmethod
-	def _checkOutgoingName(name):
-		name = name.split("/")
-
-		if name[-1] in string.digits:
-			name = name[:-1]
-
-		return " ".join(name)
-
-
 	@staticmethod
 	def cosineSimilarity(vector1, vector2):
 		return 1 - np.inner(vector1, vector2) / (norm(vector1) * norm(vector2))
@@ -115,26 +96,30 @@ class FaceRecognizer:
 		return faces, boxes, landmarks
 
 
-	def enroll(self, vector, name):
+	def enroll(self, vector, name, **kwargs):
 		assert self.dataBase is not None
 
-		name = self._checkIncomingName(name)
-		self.dataBase.put(name, vector)
+		if kwargs.pop("update", False):
+			name = self.dataBase.checkIncomingName(name)
+			self.dataBase.update(vector, name, **kwargs)
+		else:
+			name = self.dataBase.checkIncomingName(name, addIndex=True)
+			self.dataBase.put(vector, name, **kwargs)
 
-		print("User {} has been enrolled".format(name))
 
+	def enrollFromImageTensor(self, image, name, **kwargs):
+		kwargs["count"] = 1
 
-	def enrollFromImageTensor(self, image, name):
 		embeddings, boxes, landmarks = self._processImageTensor(image, enrollment=True)
 
-		self.enroll(embeddings[0], name)
+		self.enroll(embeddings[0], name, **kwargs)
 
 		return boxes, landmarks
 
 
-	def enrollFromImageFile(self, filepath, name, readMode=1):
+	def enrollFromImageFile(self, filepath, name, readMode=1, **kwargs):
 		image = cv2.imread(filepath, readMode)
-		self.enrollFromImageTensor(image, name)
+		self.enrollFromImageTensor(image, name, **kwargs)
 
 
 	def _enrollVideoStream(self, frame, name, container:list, show, windowName):
@@ -149,28 +134,30 @@ class FaceRecognizer:
 			cv2.imshow(windowName, frame)
 
 
-	def enrollFromVideoFile(self, filepath, name, show=False, windowName="Video enrollment"):
+	def enrollFromVideoFile(self, filepath, name, show=False, windowName="Video enrollment", **kwargs):
 		container = []
 		videoStream(filepath, self._enrollVideoStream, name=name, container=container, show=show, windowName=windowName)
 
+		kwargs["count"] = len(container)
 		container = np.average(np.array(container), axis=0)
-		self.enroll(container, name)
+		self.enroll(container, name, **kwargs)
 
-		print("User {} has been enrolled".format(self._checkIncomingName(name)))
+		print("User {} has been enrolled".format(self.dataBase.checkIncomingName(name)))
 
 
-	def enrollFromCamera(self, webcamID, name, show=False, windowName="Video enrollment"):
+	def enrollFromCamera(self, webcamID, name, show=False, windowName="Video enrollment", **kwargs):
 		container = []
 		webCamera(webcamID, self._enrollVideoStream, framesLimit=50, name=name, container=container, show=show,
 		                      windowName=windowName)
 
+		kwargs["count"] = len(container)
 		container = np.average(np.array(container), axis=0)
-		self.enroll(container, name)
+		self.enroll(container, name, **kwargs)
 
-		print("User {} has been enrolled".format(self._checkIncomingName(name)))
+		print("User {} has been enrolled".format(self.dataBase.checkIncomingName(name)))
 
 
-	def enrollFromFolder(self, folder, name, readMode=1):
+	def enrollFromFolder(self, folder, name, readMode=1, **kwargs):
 		files = [f for f in os.listdir(folder) if f.lower().endswith((".jpg", ".png", ".jpeg"))]
 
 		vector = []
@@ -180,9 +167,10 @@ class FaceRecognizer:
 
 			vector.append(np.ravel(embeddings))
 
+		kwargs["count"] = len(vector)
 		vector = np.average(vector, axis=0)
 
-		self.enroll(vector, name)
+		self.enroll(vector, name, **kwargs)
 
 
 	def identify(self, vector, unknownThreshold=0.5):
@@ -192,20 +180,24 @@ class FaceRecognizer:
 
 		minScore = 1
 		result = "Unknown"
-		for name in self.dataBase:
-			value = self.dataBase.get(name)
+		for user in self.dataBase:
+			value = self.dataBase.get(user)
+
+			if self.dataBase.type == "django":
+				user = [i for i in [user["surname"], user["name"], user["patronymic"]] if i]
+				user = " ".join(user)
 
 			score = self.cosineSimilarity(vector, value)
 			# score = self._distance(vector, value)
 			# score = np.sum(np.square(np.subtract(vector, value)), 0)
 
-			scores[name] = score
+			scores[user] = score
 			# scores[name + "_dist"] = np.sum(np.square(np.subtract(vector, value)), 0)
 
-			result = name if (score < minScore and score < unknownThreshold) else result
+			result = user if (score < minScore and score < unknownThreshold) else result
 			minScore = score if score < minScore else minScore
 
-		result = self._checkOutgoingName(result)
+		result = self.dataBase.checkOutgoingName(result)
 
 		return result, scores
 
@@ -276,7 +268,7 @@ def webCamera(webcamID, action, framesLimit=None, **kwargs):
 	stream.set(cv2.CAP_PROP_FRAME_HEIGHT, captureSize[1])
 
 	frameIdx = 0
-	while frameIdx <= framesLimit:
+	while frameIdx < framesLimit:
 		grabbed, frame = stream.read()
 		if not grabbed:
 			break
@@ -363,9 +355,12 @@ def identifyAuto(embedder:FaceRecognizer, usersPath):
 
 
 def main():
-	dataBase = DataBase(
-		filepath=RecognizerConfig.DATA_BASE_PATH
-	)
+	# dataBase = DBHDF(
+	# 	filepath=RecognizerConfig.DATA_BASE_PATH
+	# )
+
+	os.environ["DJANGO_SETTINGS_MODULE"] = "DataBase.DataBase.settings"
+	dataBase = DBDjango(password="FEFUdatabase")
 
 	detector = RetinaFace(
 		prefix=DetectorConfig.PREFIX,
@@ -379,15 +374,18 @@ def main():
 		detector=detector
 	)
 
-	# enrollAuto(recognizer, r"D:\data\Faces\Demo")
-	identifyAuto(recognizer, r"D:\data\Faces\Demo")
+	# recognizer.enrollFromImageFile(r"D:\data\Faces\MySets\Anton\enr\0002.JPG", name="Anton", surname="Drobyshev")
+	# recognizer.identifyViaImageFile(filepath=r"D:\data\Faces\MySets\Anton\ver\cUwh_3_OCgY.jpg")
+
+	# enrollAuto(recognizer, r"D:\data\Faces\MySets")
+	# identifyAuto(recognizer, r"D:\data\Faces\MySets")
 	# recognizer.identifyViaImageFile(r"D:\data\Faces\Results\Unknown_1.png")
 	# recognizer.identifyViaVideoFile(filepath=r"D:\data\Faces\Friends\FRIENDS - Season 6 Intro A [HD].mp4")
 
 	# enroll(recognizer, usersEnroll)
 	# identify(recognizer, usersIdentify)
 	# recognizer.enrollFromCamera(0, "Anton", show=True)
-	# recognizer.identifyViaCamera(0)
+	recognizer.identifyViaCamera(0)
 	# recognizer.identifyViaVideoFile(r"D:\data\Faces\Demo.avi")
 
 

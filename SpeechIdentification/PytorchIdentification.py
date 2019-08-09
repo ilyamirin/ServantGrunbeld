@@ -7,8 +7,8 @@ from numpy.linalg import norm
 
 import torch
 
-from ProjectUtils.DataBase import DataBase
-from ProjectUtils.Microphone import AUTO_DURATION_LIMIT, AUTO_SILENCE_LIMIT
+from DataBase.DataBaseHDF import DataBase
+from ProjectUtils.Microphone import AUTO_DURATION_LIMIT
 
 try:
 	from .Identification import SpeakerIdentifier

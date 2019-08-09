@@ -1,6 +1,6 @@
 import os
 import h5py
-
+import string
 import numpy as np
 
 
@@ -95,6 +95,25 @@ class DataBase:
 			return DataBase._getNested(base[key], "/".join(keys))
 
 
+	@staticmethod
+	def checkOutgoingName(name):
+		name = name.split("/")
+
+		if name[-1] in string.digits:
+			name = name[:-1]
+
+		return " ".join(name)
+
+
+	def checkIncomingName(self, name, addIndex=False):
+		name = name.split("/")
+
+		if not name[-1] in string.digits and len(name) == 1 and addIndex:
+			name = [name[-1], str(len(self.get("/".join(name), {})))]
+
+		return "/".join(name)
+
+
 	def _showBase(self):
 		with self._open(self.filepath, "r") as file:
 			base = {}
@@ -112,7 +131,11 @@ class DataBase:
 				return self._getFullKeys(file)
 
 
-	def put(self, name, value):
+	def update(self, value, name, **kwargs):
+		return self.put(value, name)
+
+
+	def put(self, value, name, **kwargs):
 		if self.locked:
 			raise PermissionError("Data base is locked")
 
@@ -149,7 +172,7 @@ class DataBase:
 			print("User {} isn't represented in base".format(name))
 			return value
 		except TypeError:
-			print("Variable 'name' must be full and lead to embedding")
+			print("Variable 'name' must be full and leads to embedding")
 			return value
 
 

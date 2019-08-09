@@ -6,7 +6,7 @@ from struct import pack, unpack
 from multiprocessing import Process
 
 from . import Tasks
-from ProjectUtils.DataBase import DataBase
+from DataBase.DataBaseHDF import DataBase
 from SpeechIdentification.Config import IdentifierConfig
 from SpeechIdentification.PytorchIdentification import Identifier
 
