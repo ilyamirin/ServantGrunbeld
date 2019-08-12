@@ -76,7 +76,7 @@ def downloadFile(url, filename, proxy=None):
 
 def downloadWeights(proxy=None):
 	folder = os.path.join(_curPath, "Data")
-	filename = "face_recognition_model-0000456.params"
+	filename = "face_recognition_model-0000.params"
 
 	print("\nModel weights will be downloaded. Proceed? (y/n)")
 	answer = requireAnswer()
