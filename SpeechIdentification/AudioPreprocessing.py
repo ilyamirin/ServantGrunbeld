@@ -4,7 +4,12 @@ from typing import Optional, Union
 import numpy as np
 import librosa
 import struct
-import webrtcvad
+
+try:
+	import webrtcvad
+	WEBRTC = "webrtc"
+except ModuleNotFoundError:
+	WEBRTC = "librosa"
 
 from scipy.io.wavfile import read as audio_read
 from scipy.ndimage.morphology import binary_dilation
@@ -17,7 +22,6 @@ except ImportError:
 
 int16_max = (2 ** 15) - 1
 LIBROSA = "librosa"
-WEBRTC = "webrtc"
 
 
 def preprocess_file(file, vad=LIBROSA):

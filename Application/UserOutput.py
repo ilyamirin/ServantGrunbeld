@@ -35,6 +35,19 @@ async def recv_user_request():
 
 
 async def synthesize_voice(text):
+    def clear_str(s):
+        allowed_signs = " ,.!?:"
+        s = s.replace("%", " процентов")
+        def is_allowed(c: str):
+            return c.isalnum() or c in allowed_signs
+        s = ''.join([c for c in s if is_allowed(c)])
+        for as_ in allowed_signs:
+            s = s.replace(" " + as_, as_)
+        for as_ in allowed_signs:
+            s = s.replace(as_, as_ + " ")
+        return s
+
+    text = clear_str(text)
     proc = await asyncio.create_subprocess_shell(
         f"text2wave -f {CFG.FESTIVAL_FREQ} -eval '(voice_msu_ru_nsh_clunits)'",
         stdin=asyncio.subprocess.PIPE,

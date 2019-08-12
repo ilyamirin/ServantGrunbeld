@@ -101,7 +101,7 @@ class Identifier(SpeakerIdentifier):
 
 	def enrollFromFile(self, file, name):
 		embedding = self._getEmbeddingFromFile(file)
-		self.enroll(name, embedding)
+		self.enroll(embedding, name)
 
 
 	def enrollFromMicrophone(self, name):
@@ -157,6 +157,7 @@ class Identifier(SpeakerIdentifier):
 
 	def identifyViaMicrophone(self, unknownThreshold=0.3):
 		with self.microphone as micro:
+			print("record")
 			audio = micro.recordAuto(mode=AUTO_DURATION_LIMIT, threshold=6, addSilence=False)
 
 		results, scores = self.identifyViaFile(audio, unknownThreshold)
@@ -221,11 +222,12 @@ def main():
 		dataBase=dataBase
 	)
 
-	enrollAuto(embedder, r"D:\data\Speech\Voices_audio\Demo")
-	identifyAuto(embedder, r"D:\data\Speech\Voices_audio\Demo")
+	# enrollAuto(embedder, r"D:\data\Speech\Voices_audio\Demo")
+	# identifyAuto(embedder, r"D:\data\Speech\Voices_audio\Demo")
 
-	# result, _ = embedder.identifyViaMicrophone()
-	# print(result)
+	# embedder.enrollFromMicrophone("Aleksei")
+	result, _ = embedder.identifyViaMicrophone()
+	print(result)
 
 	# enroll(embedder, usersEnr)
 	#
