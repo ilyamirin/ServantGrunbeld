@@ -6,8 +6,8 @@ import cv2
 from numpy.linalg import norm
 
 from ProjectUtils.Renderers import OpenCVRenderer as renderer
-from DataBase.DataBaseHDF import DataBase as DBHDF
-from DataBase.DjangoAPIWrapper import DataBase as DBDjango
+from DataBaseKit.DataBaseHDF import DataBase as DBHDF
+from DataBaseKit.DjangoAPIWrapper import DataBase as DBDjango
 from FaceDetection.RetinaFaceDetector import RetinaFace
 from FaceDetection.Config import DetectorConfig
 
@@ -359,7 +359,7 @@ def main():
 	# 	filepath=RecognizerConfig.DATA_BASE_PATH
 	# )
 
-	os.environ["DJANGO_SETTINGS_MODULE"] = "DataBase.DataBase.settings"
+	os.environ["DJANGO_SETTINGS_MODULE"] = "DataBaseKit.DataBase.settings"
 	dataBase = DBDjango(password="FEFUdatabase")
 
 	detector = RetinaFace(

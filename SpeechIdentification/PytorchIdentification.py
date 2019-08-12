@@ -7,7 +7,7 @@ from numpy.linalg import norm
 
 import torch
 
-from DataBase.DataBaseHDF import DataBase
+from DataBaseKit.DataBaseHDF import DataBase
 from ProjectUtils.Microphone import AUTO_DURATION_LIMIT
 
 try:
