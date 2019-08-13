@@ -49,14 +49,13 @@ class FaceRecognizer:
 		return model
 
 
-	def _getEmbedding(self, face):
-		input_blob = np.expand_dims(face, axis=0)
-		data = mx.nd.array(input_blob)
+	def _getEmbedding(self, faces):
+		data = mx.nd.array(faces)
 		db = mx.io.DataBatch(data=(data,))
 		self.net.forward(db, is_train=False)
-		embedding = self.net.get_outputs()[0].asnumpy()
+		embeddings = self.net.get_outputs()[0].asnumpy()
 
-		return embedding.flatten()
+		return embeddings
 
 
 	def _processImageTensor(self, tensor, enrollment=False):
@@ -65,7 +64,8 @@ class FaceRecognizer:
 		if enrollment and len(faces) > 1:
 			raise TooManyFaces
 
-		embeddings = [self._getEmbedding(face) for face in faces]
+		embeddings = self._getEmbedding(np.array(faces))
+		# embeddings = [self._getEmbedding(face) for face in faces]
 
 		return embeddings, boxes, landmarks
 
@@ -375,7 +375,7 @@ def main():
 	)
 
 	# recognizer.enrollFromImageFile(r"D:\data\Faces\MySets\Anton\enr\0002.JPG", name="Anton", surname="Drobyshev")
-	# recognizer.identifyViaImageFile(filepath=r"D:\data\Faces\MySets\Anton\ver\cUwh_3_OCgY.jpg")
+	recognizer.identifyViaImageFile(filepath=r"D:\data\Faces\Demo\Dmitriy_Sukhoverov\ver\2-z14-180f2ff2-a3f5-40b6-9d36-e66acecce680.jpg")
 
 	# enrollAuto(recognizer, r"D:\data\Faces\MySets")
 	# identifyAuto(recognizer, r"D:\data\Faces\MySets")
