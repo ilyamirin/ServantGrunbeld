@@ -64,7 +64,8 @@ class AzureRecognizer(Recognizer):
 
 		fullRequest = "{}/{}?language={}&format={}".format(self.REST["base"], self.REST["path"],
 		                                                   self.language, self.format)
-		response = requests.post(fullRequest, headers=headers, data=data)
+		proxies = {'http': 'http://proxy.dvfu.ru:3128', 'https': 'http://proxy.dvfu.ru:3128'}
+		response = requests.post(fullRequest, headers=headers, data=data, proxies=proxies)
 
 		return response
 
@@ -92,7 +93,8 @@ class AzureRecognizer(Recognizer):
 
 		result = response.json().get("NBest", "")
 		if result != "":
-			result = result[0]["Display"]
+			# result = result[0]["Display"]
+			result = result[0]["Lexical"]
 
 		return result
 

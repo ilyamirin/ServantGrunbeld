@@ -15,6 +15,7 @@ class DataBase:
 
 		self.sessionBase = {}
 		self.locked = locked
+		self.type = "hdf"
 
 
 	def __enter__(self):
