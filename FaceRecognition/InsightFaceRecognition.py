@@ -64,7 +64,7 @@ class FaceRecognizer:
 		if enrollment and len(faces) > 1:
 			raise TooManyFaces
 
-		embeddings = self._getEmbedding(np.array(faces))
+		embeddings = self._getEmbedding(np.array(faces)) if faces else []
 		# embeddings = [self._getEmbedding(face) for face in faces]
 
 		return embeddings, boxes, landmarks
@@ -355,9 +355,9 @@ def identifyAuto(embedder:FaceRecognizer, usersPath):
 
 
 def main():
-	# dataBase = DBHDF(
-	# 	filepath=RecognizerConfig.DATA_BASE_PATH
-	# )
+	dataBase = DBHDF(
+		filepath=RecognizerConfig.DATA_BASE_PATH
+	)
 
 	os.environ["DJANGO_SETTINGS_MODULE"] = "DataBaseKit.DataBase.settings"
 	dataBase = DBDjango(password="FEFUdatabase")
