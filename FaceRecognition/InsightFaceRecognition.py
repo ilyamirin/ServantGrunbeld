@@ -71,8 +71,10 @@ class FaceRecognizer:
 
 
 	@staticmethod
-	def cosineSimilarity(vector1, vector2):
-		return 1 - np.inner(vector1, vector2) / (norm(vector1) * norm(vector2))
+	def cosineSimilarity(matrix, vector):
+		axis = 0 if np.ndim(matrix) == 1 else 1
+		return 1 - np.inner(matrix, vector) / (norm(matrix, axis=axis) * norm(vector))
+
 
 
 	@staticmethod
@@ -176,26 +178,23 @@ class FaceRecognizer:
 	def identify(self, vector, unknownThreshold=0.5):
 		assert self.dataBase is not None
 
-		scores = {}
-
-		minScore = 1
 		result = "Unknown"
+
+		values = []
+		users = []
 		for user in self.dataBase:
 			value = self.dataBase.get(user)
 
-			if self.dataBase.type == "django":
-				user = [i for i in [user["surname"], user["name"], user["patronymic"]] if i]
-				user = " ".join(user)
+			users.append(user)
+			values.append(value)
 
-			score = self.cosineSimilarity(vector, value)
-			# score = self._distance(vector, value)
-			# score = np.sum(np.square(np.subtract(vector, value)), 0)
+		values = np.array(values)
 
-			scores[user] = score
-			# scores[name + "_dist"] = np.sum(np.square(np.subtract(vector, value)), 0)
+		resultMatrix = self.cosineSimilarity(values, vector)
 
-			result = user if (score < minScore and score < unknownThreshold) else result
-			minScore = score if score < minScore else minScore
+		scores = {users[i]: score for i, score in enumerate(resultMatrix)}
+		minIdx = np.argmin(resultMatrix)
+		result = users[minIdx] if resultMatrix[minIdx] < unknownThreshold else result
 
 		result = self.dataBase.checkOutgoingName(result)
 
@@ -359,8 +358,8 @@ def main():
 		filepath=RecognizerConfig.DATA_BASE_PATH
 	)
 
-	os.environ["DJANGO_SETTINGS_MODULE"] = "DataBaseKit.DataBase.settings"
-	dataBase = DBDjango(password="FEFUdatabase")
+	# os.environ["DJANGO_SETTINGS_MODULE"] = "DataBaseKit.DataBase.settings"
+	# dataBase = DBDjango(password="FEFUdatabase")
 
 	detector = RetinaFace(
 		prefix=DetectorConfig.PREFIX,
@@ -375,7 +374,7 @@ def main():
 	)
 
 	# recognizer.enrollFromImageFile(r"D:\data\Faces\MySets\Anton\enr\0002.JPG", name="Anton", surname="Drobyshev")
-	recognizer.identifyViaImageFile(filepath=r"D:\data\Faces\Demo\Dmitriy_Sukhoverov\ver\2-z14-180f2ff2-a3f5-40b6-9d36-e66acecce680.jpg")
+	# recognizer.identifyViaImageFile(filepath=r"D:\data\Faces'\massovoe_selfie-1.png")
 
 	# enrollAuto(recognizer, r"D:\data\Faces\MySets")
 	# identifyAuto(recognizer, r"D:\data\Faces\MySets")
